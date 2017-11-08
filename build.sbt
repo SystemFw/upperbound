@@ -4,7 +4,8 @@ lazy val root = (project in file(".")).settings(
   consoleSettings,
   typeSystemEnhancements,
   dependencies,
-  testSettings,
+  tests,
+  docs,
   publishSettings
 )
 
@@ -16,7 +17,7 @@ lazy val commonSettings = Seq(
 )
 
 lazy val consoleSettings = Seq(
-  initialCommands := s"import com.ncr.bound._",
+  initialCommands := s"import upperbound._",
   scalacOptions in (Compile, console) -= "-Ywarn-unused-import"
 )
 
@@ -45,40 +46,57 @@ def dep(org: String)(version: String)(modules: String*) =
   }
 
 lazy val dependencies = {
-  val fs2 = dep("co.fs2")("0.10.0-M4")(
-    "fs2-core",
-    "fs2-io"
+  val scalaz = dep("org.scalaz")("7.2.8")(
+    "scalaz-core",
+    "scalaz-concurrent"
   )
 
-  val mixed = Seq(
-    "org.typelevel" %% "cats" % "0.9.0",
-    "org.typelevel" %% "cats-effect" % "0.3"
+  val fs2 = Seq(
+    "co.fs2" %% "fs2-core" % "0.9.7",
+    "co.fs2" %% "fs2-scalaz" % "0.2.0"
   )
 
   libraryDependencies ++= Seq(
-    fs2,
-    mixed
+    scalaz,
+    fs2
   ).flatten
 }
 
-lazy val testSettings = {
-  val specs2 = Seq(
-    "specs2-core",
-    "specs2-matcher-extra",
-    "specs2-scalacheck"
-  ).map("org.specs2" %% _ % "3.8.8")
+lazy val tests = {
+    val dependencies = {
+    val specs2 = dep("org.specs2")("3.8.9")(
+      "specs2-core",
+      "specs2-scalaz",
+      "specs2-scalacheck"
+    )
 
-  val scalacheck = "org.scalacheck" %% "scalacheck" % "1.13.4"
+    val mixed = Seq(
+      "org.scalacheck" %% "scalacheck" % "1.13.4",
+      "org.scalactic" %% "scalactic" % "3.0.1"
+    )
 
-  Seq(
-    libraryDependencies ++= (specs2 :+ scalacheck).map(_ % "test"),
+    libraryDependencies ++= Seq(
+      specs2,
+      mixed
+    ).flatten.map(_ % "test")
+  }
+
+  val frameworks =
     testFrameworks := Seq(TestFrameworks.Specs2)
-  )
+
+  Seq(dependencies, frameworks)
 }
 
-import ReleaseTransformations._
+lazy val docs =
+  scalacOptions in (Compile, doc) ++= Seq(
+    "-skip-packages",
+    "fs2:scalaz",
+    "-no-link-warnings"
+  )
 
 lazy val publishSettings = {
+  import ReleaseTransformations._
+
   val username = "SystemFw"
 
   Seq(

@@ -1,4 +1,220 @@
-# Upperbound
+# upperbound
 
-**upperbound** is a library for throttling and limiting of fs2 Streams
+**upperbound** is a purely functional rate limiter. It
+allows you to submit jobs concurrently, which will then be started at
+a rate no higher than what you specify.
+ 
+NOTE: The library is currently in the process of being migrated from
+fs2 0.9 + scalaz to fs2 0.10 + cats + cats-effect.
 
+## Installation
+To get **upperbound**, add the following line to your `build.sbt`
+
+``` scala
+libraryDependencies += "org.systemfw" %% "upperbound" % "version"
+```
+Look at the [CHANGELOG.md] for the latest release.
+
+## Purity
+
+Everything in **bound** is a pure function, which allows for ease of
+reasoning and composability.
+
+TODO The library depends on fs2 and cats-effect, some familiarity is expected.
+
+A full discussion on purely functional programmming is out of scope
+for this document, the unfamiliar reader should consult:
+ - [Purely functional IO](https://www.slideshare.net/InfoQ/purely-functional-io)
+ - [An IO monad for cats](http://typelevel.org/blog/2017/05/02/io-monad-for-cats.html)
+ - [Scalaz Task: the missing documentation](http://timperrett.com/2014/07/20/scalaz-task-the-missing-documentation/)
+
+On a practical level, it means that every function that would return
+`A` + have side effects is instead pure but returns an `F[A]`, which
+represents a computation that, *_when run_*, will have side effects,
+possibly asynchronously, possibly throwing exceptions.  Functions
+returning `F` are pure because nothing ever happens when an `F`
+is returned, effects only happen when the `F` is run.
+The key idea is that `F`s can be composed without actually having
+to run them using `flatMap`, `for comprehensions`, or the various
+other combinators (including functions for exception handling and
+concurrency), which in turn return other `F`s.
+In the end, your whole program will become one giant pure expression
+represented by an `F[A]`, which can be run _only once, at the end of
+the world_ (typically your main), to execute the effects.
+This approach allows us to reap all the benefits of functional
+programming while still having effectful programs that interact with
+the world.
+
+
+## Usage
+
+**upperbound**'s main datatypes are two: `Worker` and `Limiter`.
+`Worker` is the central entity in the library, it's defined as:
+
+``` scala
+trait Worker[F[_]] {
+  def submit[A](job: F[A], priority: Int = 0): F[Unit]
+  def await[A](job: F[A], priority: Int = 0): F[A]
+}
+```
+The `submit` method takes an `F[A]`, which can represent any
+program, and returns an `F[Unit]` that represents the action of
+submitting it to the limiter, with the given priority. The semantics
+of `submit` are fire-and-forget: the returned `F[Unit]` immediately
+returns, without waiting for the input `F[A]` to complete its
+execution.
+
+The `await` method takes an `F[A]`, which can represent any program,
+and returns another `F[A]` that represents the action of submitting
+the input `F` to the limiter with the given priority, and waiting
+for its result.  The semantics of `await` are blocking: the returned
+`F[A]` only completes when the input `F` has finished its
+execution. However, the blocking is only semantic, no actual threads
+are blocked by the implementation.
+
+Both `Worker.submit` and `Worker.await` are designed to be called
+concurrently: every concurrent call submits a job to `Limiter`, and
+they are then started (in order of priority) at a rate which is
+no higher then the maximum rate you specify on construction.
+A higher number indicates higher priority, and FIFO order is used in
+case there are multiple jobs with the same priority being throttled.
+
+Naturally, you need to ensure that all the places in your code that
+need rate limiting share the same instance of `Worker`. It might be
+not obvious at first how to do this purely functionally, but it's in
+fact very easy: just pass a `Worker` as a parameter. For example, if
+you have a class with two methods that need rate limiting, have the
+constructor of your class accept a `Worker`.
+
+Following this approach, _your whole program_ will end up having type
+`Worker => F[Whatever]`, and all you need now is creating a
+`Worker`. This is what `Limiter` is for:
+
+``` scala
+trait Limiter[F[_]] {
+  def worker: Worker[F]
+  def shutDown: F[Unit])
+}
+
+object Limiter {
+  def start(maxRate: Rate)(implicit ec: ExecutionContext): F[Limiter]
+}
+```
+You should only need `Limiter` at the end of your program, to assemble
+all the parts together. Imagine your program is defined as:
+
+TODO: parametric F?
+TODO: imports, import section
+TODO: tut
+
+``` scala
+import upperbound._
+
+case class YourWholeProgram(w: Worker[IO]) {
+  def doStuff: IO[Unit] = {
+     def yourLogic: IO[Whatever] = ???
+     w.submit(yourLogic)
+  }
+}
+```
+you can then do:
+
+``` scala
+import upperbound._, syntax.rate._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+
+val managed = for {
+  limiter <- Limiter.start[IO](100 every 1.minute)
+  res <- YourWholeProgram(limiter.worker).doStuff
+  _ <- client.shutdown
+} yield res
+
+```
+`managed` is an `IO` that, when run, will start a `Limiter`, run it in
+parallel with your program, and shut it down when your program
+terminates. This will typically be the last `IO` in your call chain,
+which means you can do:
+``` scala
+object Main extends App {
+ managed.unsafeRunSync
+}
+```
+How exactly you run `managed` might depend on the specific
+framework/lib you're using. TODO mention Stream.bracket
+
+Note: the `every` syntax for declaring `Rate`s requires
+
+``` scala
+import upperbound.syntax.rate._
+import scala.concurrent.duration._
+```
+
+## Testing
+One further advantage of the architecture outlined above is testability.
+In particular, you normally don't care about rate limiting in unit
+tests, but the logic you are testing might require a `Worker` when
+it's actually running. In this case, it's enough to pass in a stub
+implementation of `Worker` that contains whatever logic is needed for
+your tests. In particular, you can use `upperbound.testWorker` to get an
+instance that does no rate limiting, and only has synchronous methods.
+
+## Backpressure
+
+`upperbound` gives you a mechanism for applying backpressure to the
+`Limiter` based on the result of a specific job submitted by the
+corresponding `Worker` (e.g. a REST call that got rejected upstream).
+In particular, both `submit` and `await` take an extra (optional)
+argument:
+
+``` scala
+def submit[A](job: F[A], priority: Int, ack: BackPressure.Ack[A])
+def await[A](job: F[A], priority: Int, ack: BackPressure.Ack[A])
+```
+
+`BackPressure.Ack[A]` is an alias for `Either[Throwable, A] => BackPressure`,
+where `case class BackPressure(slowDown: Boolean)` is used to assert
+that backpressure is needed based on a specific result (or error) of
+the submitted job. You can write your own `Ack`s, but `upperbound` provides
+some for you:
+
+- `BackPressure.never`: never signal backpressure. If you don't
+  specify an `ack`, this is passed as a default.
+- `BackPressure.onAllErrors`: signal backpressure every time a job
+  fails with any error.
+- `BackPressure.onError[E <: Throwable]`: signal backpressure if a job
+  fails with a specific type of exception. Meant to be used with
+  explicit type application, e.g. `BackPressure.onError[MyException]`.
+- `BackPressure.onResult(cond: A => Boolean)`: signal backpressure
+  when the result of a job satisfies the given condition.
+
+To deal with backpressure, `Limiter.start` takes extra optional parameters:
+
+``` scala
+def start(maxRate: Rate,
+          backOff: FiniteDuration => FiniteDuration = identity,
+          n: Int = Int.MaxValue): F[Limiter]
+```
+
+Every time a job signals backpressure is needed, the Limiter will
+adjust its current rate by applying `backOff` to it. This means the
+rate will be adjusted by calling `backOff` repeatedly whenever
+multiple consecutive jobs signal for backpressure, and reset to its
+original value when a job signals backpressure is no longer needed.
+
+Note that since jobs submitted to the Limiter are processed
+asynchronously, rate changes will not propagate instantly when the
+rate is smaller than the job completion time. However, the rate will
+eventually converge to its most up-to-date value.
+
+Similarly, `n` allows you to place a bound on the maximum number of
+jobs allowed to queue up while waiting for execution. Once this number
+is reached, the `F` returned by any call to the corresponding
+`Worker` will immediately fail with a `LimitReachedException`, so
+that you can in turn signal for backpressure downstream. Processing
+restarts as soon as the number of jobs waiting goes below `n` again.
+
+Please be aware that the backpressure support doesn't interfere with
+your own error handling, nor does any error handling (e.g. retrying)
+for you. This is an application specific concern and should be handled
+in application code.
