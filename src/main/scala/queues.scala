@@ -2,7 +2,6 @@ package upperbound
 
 import fs2.{Stream, async}
 import cats.effect.Effect
-import scala.concurrent.ExecutionContext
 
 import cats.kernel.Order
 import cats.kernel.instances.long._
@@ -15,6 +14,7 @@ import cats.syntax.flatMap._
 
 import dogs.Heap
 
+import scala.concurrent.ExecutionContext
 
 object queues {
 

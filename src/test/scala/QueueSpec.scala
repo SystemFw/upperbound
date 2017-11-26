@@ -2,11 +2,12 @@ package upperbound
 
 import fs2.Stream
 import cats.effect.IO
-import scala.concurrent.ExecutionContext
 
 import cats.syntax.apply._
 import cats.syntax.applicative._
 import cats.syntax.option._
+
+import scala.concurrent.ExecutionContext
 
 import queues.Queue
 
