@@ -1,6 +1,6 @@
 // package upperbound
 
-// import fs2.{async, time, Pipe, Stream, Scheduler}
+// import fs2.{async, Pipe, Stream, Scheduler}
 // import fs2.util.{Async, Attempt}
 // import scala.concurrent.duration._
 // import scalaz.{Applicative, Monad}

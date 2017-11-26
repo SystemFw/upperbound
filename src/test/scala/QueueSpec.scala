@@ -1,106 +1,98 @@
-// package upperbound
+package upperbound
 
-// import fs2.Stream
-// import fs2.util.Async
-// import fs2.interop.scalaz._
+import fs2.Stream
+import cats.effect.IO
+import scala.concurrent.ExecutionContext
 
-// import scala.concurrent.ExecutionContext.Implicits.global
-// import scalaz.concurrent.Task
-// import scalaz.syntax.applicative._
-// import scalaz.syntax.std.option._
+import cats.syntax.apply._
+import cats.syntax.applicative._
+import cats.syntax.option._
 
-// import queues.Queue
+import queues.Queue
 
-// import org.specs2.mutable.Specification
-// import org.specs2.matcher.TaskMatchers
-// import org.specs2.ScalaCheck
+import org.specs2.mutable.Specification
+import org.specs2.ScalaCheck
 
-// class QueueSpec extends Specification with TaskMatchers with ScalaCheck {
+class QueueSpec(implicit ec: ExecutionContext) extends Specification with ScalaCheck {
+  "An unbounded Queue" should {
 
-//   import pools._
+    // Using property based testing for this assertion greatly
+    // increases the chance of testing all the concurrent
+    // interleavings.
+    "block on an empty queue until an element is available" in prop {
+      (fst: Int, snd: Int) =>
+        def concurrentProducerConsumer =
+          for {
+            queue <- Stream.eval(Queue.unbounded[IO, Int])
+            consumer = Stream.eval(queue.dequeue)
+            producer = Stream.eval(fst.pure[IO] <* queue.enqueue(snd, 0))
+            result <- consumer.merge(producer)
+          } yield result
 
-//   type F[A] = Task[A]
-//   val F = Async[Task]
+        concurrentProducerConsumer.runLog.unsafeRunSync must contain(fst, snd)
+    }
 
-//   "An unbounded Queue" should {
+    "dequeue the highest priority elements first" in prop {
+      (elems: Vector[Int]) =>
+        def input = elems.zipWithIndex
 
-//     // Using property based testing for this assertion greatly
-//     // increases the chance of testing all the concurrent
-//     // interleavings.
-//     "block on an empty queue until an element is available" in prop {
-//       (fst: Int, snd: Int) =>
-//         def concurrentProducerConsumer =
-//           for {
-//             queue <- Stream.eval(Queue.unbounded[F, Int])
-//             consumer = Stream.eval(queue.dequeue)
-//             producer = Stream.eval(fst.pure[F] <* queue.enqueue(snd, 0))
-//             result <- consumer.merge(producer)
-//           } yield result
+        prog(input).unsafeRunSync must beEqualTo(elems.reverse)
+    }
 
-//         concurrentProducerConsumer.runLog should returnValue(contain(fst, snd))
-//     }
+    "dequeue elements with the same priority in FIFO order" in prop {
+      (elems: Vector[Int]) =>
+        def input = elems.map(_ -> 0)
 
-//     "dequeue the highest priority elements first" in prop {
-//       (elems: Vector[Int]) =>
-//         def input = elems.zipWithIndex
+        prog(input).unsafeRunSync must beEqualTo(elems)
+    }
+  }
 
-//         prog(input) must returnValue(elems.reverse)
-//     }
+  "A bounded Queue" should {
+    "fail an enqueue attempt if the queue is full" in {
+      def prog =
+        for {
+          q <- Queue.bounded[IO, Int](1)
+          _ <- q.enqueue(1, 0)
+          _ <- q.enqueue(1, 0)
+        } yield ()
 
-//     "dequeue elements with the same priority in FIFO order" in prop {
-//       (elems: Vector[Int]) =>
-//         def input = elems.map(_ -> 0)
+      prog.unsafeRunSync must throwA[LimitReachedException]
+    }
 
-//         prog(input) must returnValue(elems)
-//     }
-//   }
+    "successfully enqueue after dequeueing from a full queue" in {
+      def prog =
+        for {
+          q <- Queue.bounded[IO, Int](1)
+          _ <- q.enqueue(1, 0)
+          _ <- q.enqueue(2, 0).attempt
+          _ <- q.dequeue
+          _ <- q.enqueue(3, 0)
+          r <- q.dequeue
+        } yield r
 
-//   "A bounded Queue" should {
-//     "fail an enqueue attempt if the queue is full" in {
-//       def prog =
-//         for {
-//           q <- Queue.bounded[F, Int](1)
-//           _ <- q.enqueue(1, 0)
-//           _ <- q.enqueue(1, 0)
-//         } yield ()
+      prog.unsafeRunSync must beEqualTo(3)
+    }
+  }
 
-//       prog must failWith[LimitReachedException]
-//     }
+  implicit class QueueOps[A](queue: Queue[IO, Option[A]]) {
+    def dequeueAllF: IO[Vector[A]] =
+      queue.dequeueAll.unNoneTerminate.runLog
 
-//     "successfully enqueue after dequeueing from a full queue" in {
-//       def prog =
-//         for {
-//           q <- Queue.bounded[F, Int](1)
-//           _ <- q.enqueue(1, 0)
-//           _ <- q.enqueue(2, 0).attempt
-//           _ <- q.dequeue
-//           _ <- q.enqueue(3, 0)
-//           r <- q.dequeue
-//         } yield r
+    def enqueueAllF(elems: Vector[(A, Int)]): IO[Unit] =
+      Stream
+        .emits(elems)
+        .noneTerminate
+        .evalMap {
+          case Some((e, p)) => queue.enqueue(e.some, p)
+          case None         => queue.enqueue(None, Int.MinValue)
+        }
+        .run
+  }
 
-//       prog must returnValue(3)
-//     }
-//   }
-
-//   implicit class QueueOps[A](queue: Queue[F, Option[A]]) {
-//     def dequeueAllF: F[Vector[A]] =
-//       queue.dequeueAll.unNoneTerminate.runLog
-
-//     def enqueueAllF(elems: Vector[(A, Int)]): F[Unit] =
-//       Stream
-//         .emits(elems)
-//         .noneTerminate
-//         .evalMap {
-//           case Some((e, p)) => queue.enqueue(e.some, p)
-//           case None         => queue.enqueue(None, Int.MinValue)
-//         }
-//         .run
-//   }
-
-//   def prog[A](input: Vector[(A, Int)]) =
-//     for {
-//       queue <- Queue.unbounded[F, Option[A]]
-//       _ <- queue enqueueAllF input
-//       res <- queue.dequeueAllF
-//     } yield res
-// }
+  def prog[A](input: Vector[(A, Int)]) =
+    for {
+      queue <- Queue.unbounded[IO, Option[A]]
+      _ <- queue enqueueAllF input
+      res <- queue.dequeueAllF
+    } yield res
+}

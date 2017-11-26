@@ -3,31 +3,31 @@
 // import scala.concurrent.duration._
 // import scalaz.concurrent.Task
 
-// package object upperbound {
+package object upperbound {
 
-//   type Rate = model.Rate
-//   val Rate = model.Rate
+  type Rate = model.Rate
+  val Rate = model.Rate
 
-//   /**
-//     * Syntactic sugar to create rates.
-//     *
-//     * Example (note the underscores):
-//     * {{{
-//     * import upperbound.syntax.rate._
-//     * import scala.concurrent.duration._
-//     *
-//     * val r = 100 every 1.minute
-//     * }}}
-//     */
-//   object syntax {
-//     object rate extends Rate.Syntax
-//   }
+  /**
+    * Syntactic sugar to create rates.
+    *
+    * Example (note the underscores):
+    * {{{
+    * import upperbound.syntax.rate._
+    * import scala.concurrent.duration._
+    *
+    * val r = 100 every 1.minute
+    * }}}
+    */
+  object syntax {
+    object rate extends Rate.Syntax
+  }
 
-//   type LimitReachedException = model.LimitReachedException
-//   val LimitReachedException = model.LimitReachedException
+  type LimitReachedException = model.LimitReachedException
+  val LimitReachedException = model.LimitReachedException
 
-//   type BackPressure = model.BackPressure
-//   val BackPressure = model.BackPressure
+  type BackPressure = model.BackPressure
+  val BackPressure = model.BackPressure
 
 //   type Worker = core.Worker[Task]
 
@@ -49,4 +49,4 @@
 //     * See [[core.Worker.noOp]]
 //     */
 //   def testWorker: Worker = core.Worker.noOp
-// }
+}

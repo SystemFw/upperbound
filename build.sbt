@@ -54,7 +54,7 @@ lazy val dependencies =
   )
 
 lazy val tests = {
-    val dependencies = {
+  val dependencies = {
     val specs2 = dep("org.specs2")("3.8.9")(
       "specs2-core",
       "specs2-scalacheck"
