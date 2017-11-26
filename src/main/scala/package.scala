@@ -1,7 +1,8 @@
-// import fs2.interop.scalaz._
-// import scala.concurrent.ExecutionContext
-// import scala.concurrent.duration._
-// import scalaz.concurrent.Task
+import cats.Applicative
+import cats.effect.Effect
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
+
 
 package object upperbound {
 
@@ -29,24 +30,22 @@ package object upperbound {
   type BackPressure = model.BackPressure
   val BackPressure = model.BackPressure
 
-//   type Worker = core.Worker[Task]
+  type Worker[F[_]] = core.Worker[F]
 
-//   type Limiter = core.Limiter[Task]
-//   object Limiter {
-//     import pools._
+  type Limiter[F[_]] = core.Limiter[F]
+  object Limiter {
+    /**
+      * See [[core.Limiter.start]]
+      */
+    def start[F[_]: Effect](
+        maxRate: Rate,
+        backOff: FiniteDuration => FiniteDuration = identity,
+        n: Int = Int.MaxValue)(implicit ec: ExecutionContext): F[Limiter[F]] =
+      core.Limiter.start[F](maxRate.period, backOff, n)
+  }
 
-//     /**
-//       * See [[core.Limiter.start]]
-//       */
-//     def start(
-//         maxRate: Rate,
-//         backOff: FiniteDuration => FiniteDuration = identity,
-//         n: Int = Int.MaxValue)(implicit ec: ExecutionContext): Task[Limiter] =
-//       core.Limiter.start[Task](maxRate.period, backOff, n)
-//   }
-
-//   /**
-//     * See [[core.Worker.noOp]]
-//     */
-//   def testWorker: Worker = core.Worker.noOp
+  /**
+    * See [[core.Worker.noOp]]
+    */
+  def testWorker[F[_]: Applicative]: Worker[F] = core.Worker.noOp
 }
