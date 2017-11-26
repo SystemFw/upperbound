@@ -45,28 +45,18 @@ def dep(org: String)(version: String)(modules: String*) =
     org %% name % version
   }
 
-lazy val dependencies = {
-  val scalaz = dep("org.scalaz")("7.2.8")(
-    "scalaz-core",
-    "scalaz-concurrent"
-  )
-
-  val fs2 = Seq(
-    "co.fs2" %% "fs2-core" % "0.9.7",
-    "co.fs2" %% "fs2-scalaz" % "0.2.0"
-  )
-
+lazy val dependencies =
   libraryDependencies ++= Seq(
-    scalaz,
-    fs2
-  ).flatten
-}
+    "co.fs2" %% "fs2-core" % "0.10.0-M8",
+    "org.typelevel" %% "cats-core" % "1.0.0-RC1",
+    "org.typelevel" %% "dogs-core" % "0.6.9",
+    "org.typelevel" %% "cats-effect" % "0.5"
+  )
 
 lazy val tests = {
     val dependencies = {
     val specs2 = dep("org.specs2")("3.8.9")(
       "specs2-core",
-      "specs2-scalaz",
       "specs2-scalacheck"
     )
 
@@ -87,12 +77,12 @@ lazy val tests = {
   Seq(dependencies, frameworks)
 }
 
-lazy val docs =
-  scalacOptions in (Compile, doc) ++= Seq(
-    "-skip-packages",
-    "fs2:scalaz",
-    "-no-link-warnings"
-  )
+// lazy val docs =
+//   scalacOptions in (Compile, doc) ++= Seq(
+//     "-skip-packages",
+//     "fs2:scalaz",
+//     "-no-link-warnings"
+//   )
 
 lazy val publishSettings = {
   import ReleaseTransformations._
