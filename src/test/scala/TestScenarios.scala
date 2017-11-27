@@ -1,118 +1,125 @@
-// package upperbound
+package upperbound
 
-// import fs2.{concurrent, time, Pipe, Stream}
-// import fs2.util.Async
-// import fs2.interop.scalaz._
+import fs2.{async, Pipe, Scheduler, Stream}
+import fs2.async.Ref
+import cats.effect.IO
 
-// import scala.concurrent.duration.FiniteDuration
-// import scala.concurrent.ExecutionContext.Implicits.global
+import cats.syntax.functor._
+import cats.syntax.apply._
+import cats.syntax.applicative._
 
-// import scalaz.concurrent.Task
-// import scalaz.syntax.monad._
+import scala.collection.immutable.Queue
+import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.ExecutionContext //.Implicits.global
 
-// import org.specs2.specification.BeforeAll
+import org.specs2.specification.BeforeAll
 
-// trait TestScenarios extends BeforeAll {
+trait TestScenarios extends BeforeAll {
 
-//   import pools._
+  def samplingWindow: FiniteDuration
+  def description: String
 
-//   type F[A] = Task[A]
-//   val F = Async[F]
+  def beforeAll = println {
+    s"""
+    |=============
+    | $description tests running. Sampling window: $samplingWindow
+    |=============
+   """.stripMargin('|')
+  }
 
-//   def samplingWindow: FiniteDuration
-//   def description: String
+  case class TestingConditions(
+      desiredRate: Rate,
+      backOff: FiniteDuration => FiniteDuration,
+      productionRate: Rate,
+      producers: Int,
+      jobsPerProducer: Int,
+      jobCompletion: FiniteDuration,
+      backPressure: BackPressure.Ack[Int],
+      samplingWindow: FiniteDuration
+  )
 
-//   def beforeAll = println {
-//     s"""
-//     |=============
-//     | $description tests running. Sampling window: $samplingWindow
-//     |=============
-//    """.stripMargin('|')
-//   }
+  case class Metric(diffs: Vector[Long],
+                    mean: Double,
+                    stdDeviation: Double,
+                    overshoot: Double,
+                    undershoot: Double)
+  object Metric {
+    def from(samples: Vector[Long]): Metric = {
+      def diffs =
+        Stream
+          .emits(samples)
+          .sliding(2)
+          .map { case Queue(x, y) => math.abs(x - y) }
+          .toVector
+      def mean = diffs.sum.toDouble / diffs.size
+      def variance =
+        diffs.foldRight(0: Double)((x, tot) => tot + math.pow(x - mean, 2))
+      def std = math.sqrt(variance)
+      def overshoot = diffs.max
+      def undershoot = diffs.min
 
-//   case class TestingConditions(
-//       desiredRate: Rate,
-//       backOff: FiniteDuration => FiniteDuration,
-//       productionRate: Rate,
-//       producers: Int,
-//       jobsPerProducer: Int,
-//       jobCompletion: FiniteDuration,
-//       backPressure: BackPressure.Ack[Int],
-//       samplingWindow: FiniteDuration
-//   )
+      Metric(diffs, mean, std, overshoot, undershoot)
+    }
+  }
 
-//   case class Metric(diffs: Vector[Long],
-//                     mean: Double,
-//                     stdDeviation: Double,
-//                     overshoot: Double,
-//                     undershoot: Double)
-//   object Metric {
-//     def from(samples: Vector[Long]): Metric = {
-//       def diffs =
-//         Stream
-//           .emits(samples)
-//           .sliding(2)
-//           .map { case Vector(x, y) => math.abs(x - y) }
-//           .toVector
-//       def mean = diffs.sum.toDouble / diffs.size
-//       def variance =
-//         diffs.foldRight(0: Double)((x, tot) => tot + math.pow(x - mean, 2))
-//       def std = math.sqrt(variance)
-//       def overshoot = diffs.max
-//       def undershoot = diffs.min
+  case class Result(
+      producerMetrics: Metric,
+      jobExecutionMetrics: Metric
+  )
 
-//       Metric(diffs, mean, std, overshoot, undershoot)
-//     }
-//   }
+  def mkScenario(t: TestingConditions)(
+      implicit ec: ExecutionContext): IO[Result] =
+    Scheduler.allocate[IO](2) flatMap { s =>
+      async.refOf[IO, Vector[Long]](Vector.empty) flatMap { submissionTimes =>
+        async.refOf[IO, Vector[Long]](Vector.empty) flatMap { startTimes =>
+          Limiter.start[IO](t.desiredRate, t.backOff) flatMap { limiter =>
+            val (scheduler, cleanup) = s
 
-//   case class Result(
-//       producerMetrics: Metric,
-//       jobExecutionMetrics: Metric
-//   )
+            def record(destination: Ref[IO, Vector[Long]]): IO[Unit] =
+              IO(System.currentTimeMillis) flatMap { time =>
+                destination.modify(times => time +: times).void
+              }
 
-//   def mkScenario(t: TestingConditions): F[Result] =
-//     F.refOf(Vector.empty[Long]) flatMap { submissionTimes =>
-//       F.refOf(Vector.empty[Long]) flatMap { startTimes =>
-//         Limiter.start(t.desiredRate, t.backOff) flatMap { limiter =>
-//           //
-//           def record(destination: Async.Ref[F, Vector[Long]]): F[Unit] =
-//             F.delay(System.currentTimeMillis) flatMap { time =>
-//               destination.modify(times => time +: times).void
-//             }
+            def job(i: Int) =
+              record(startTimes) *> scheduler
+                .sleep[IO](t.jobCompletion)
+                .run *> i.pure[IO]
 
-//           def job(i: Int) =
-//             record(startTimes) >> time.sleep(t.jobCompletion).run >> i.pure[F]
+            def producer: Stream[IO, Unit] =
+              Stream.range(0, t.jobsPerProducer).map(job) evalMap { x =>
+                record(submissionTimes) *> limiter.worker.submit(
+                  job = x,
+                  priority = 0,
+                  ack = t.backPressure)
+              }
 
-//           def producer: Stream[F, Unit] =
-//             Stream.range(0, t.jobsPerProducer).map(job) evalMap { x =>
-//               record(submissionTimes) >> limiter.worker.submit(job = x,
-//                                                                priority = 0,
-//                                                                ack =
-//                                                                  t.backPressure)
-//             }
+            def pulse[B]: Pipe[IO, B, B] =
+              in =>
+                scheduler
+                  .awakeEvery[IO](t.productionRate.period)
+                  .zip(in)
+                  .map(_._2)
 
-//           def pulse[B]: Pipe[F, B, B] =
-//             in =>
-//               time
-//                 .awakeEvery(t.productionRate.period)
-//                 .zip(in)
-//                 .map(_._2)
+            def concurrentProducers: Stream[IO, Unit] =
+              Stream(producer through pulse).repeat
+                .take(t.producers)
+                .join(t.producers)
 
-//           def concurrentProducers: Stream[F, Unit] =
-//             concurrent.join(t.producers)(
-//               Stream(producer through pulse).repeat.take(t.producers))
-
-//           for {
-//             _ <- F.start(concurrentProducers.run)
-//             _ <- time.sleep_(t.samplingWindow).run >> limiter.shutDown
-//             p <- submissionTimes.get
-//             j <- startTimes.get
-//           } yield
-//             Result(
-//               producerMetrics = Metric.from(p.sorted),
-//               jobExecutionMetrics = Metric.from(j.sorted)
-//             )
-//         }
-//       }
-//     }
-// }
+            for {
+              _ <- async.fork(concurrentProducers.run)
+              _ <- scheduler
+                .sleep_[IO](t.samplingWindow)
+                .run *> limiter.shutDown
+              p <- submissionTimes.get
+              j <- startTimes.get
+              _ <- cleanup
+            } yield
+              Result(
+                producerMetrics = Metric.from(p.sorted),
+                jobExecutionMetrics = Metric.from(j.sorted)
+              )
+          }
+        }
+      }
+    }
+}

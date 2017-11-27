@@ -1,96 +1,87 @@
-// package upperbound
+package upperbound
 
-// import fs2.util.Async
-// import fs2.interop.scalaz._
+import fs2.async
+import cats.effect.IO
 
-// import scala.concurrent.duration._
-// import scala.concurrent.ExecutionContext.Implicits.global
+import cats.syntax.functor._
 
-// import scalaz.concurrent.Task
-// import scalaz.syntax.monad._
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext
 
-// import org.specs2.mutable.Specification
-// import org.specs2.matcher.TaskMatchers
+import org.specs2.mutable.Specification
 
-// class SubmissionSemanticsSpec extends Specification with TaskMatchers {
+class SubmissionSemanticsSpec(implicit val ec: ExecutionContext) extends Specification {
 
-//   import pools._
+  import syntax.rate._
 
-//   type F[A] = Task[A]
-//   val F = Async[Task]
+  "A worker" >> {
 
-//   import syntax.rate._
+    "when using fire-and-forget semantics" should {
 
-//   "A worker" >> {
+      "continue execution immediately" in {
+        def prog =
+          for {
+            complete <- async.refOf[IO, Boolean](false)
+            limiter <- Limiter.start[IO](1 every 10.seconds)
+            _ <- limiter.worker submit complete.setSyncPure(true)
+            _ <- limiter.shutDown
+            res <- complete.get
+          } yield res
 
-//     "when using fire-and-forget semantics" should {
+        prog.unsafeRunSync must beFalse
+      }
+    }
 
-//       "continue execution immediately" in {
-//         def prog =
-//           for {
-//             complete <- F.refOf(false)
-//             limiter <- Limiter.start(1 every 10.seconds)
-//             _ <- limiter.worker submit complete.setPure(true)
-//             _ <- limiter.shutDown
-//             res <- complete.get
-//           } yield res
+    "when using await semantics" should {
 
-//         prog must returnValue(beFalse)
-//       }
-//     }
+      "complete when the result of the submitted job is ready" in {
+        def prog =
+          for {
+            complete <- async.refOf[IO, Boolean](false)
+            limiter <- Limiter.start[IO](1 every 1.seconds)
+            res <- limiter.worker await complete.setSyncPure(true).as("done")
+            _ <- limiter.shutDown
+            state <- complete.get
+          } yield res -> state
 
-//     "when using await semantics" should {
+        val out = prog.unsafeRunSync
+        out._1 must beEqualTo("done")
+        out._2 must beTrue
+      }
+    }
 
-//       "complete when the result of the submitted job is ready" in {
-//         def prog =
-//           for {
-//             complete <- F.refOf(false)
-//             limiter <- Limiter.start(1 every 1.seconds)
-//             // setSyncPure is only available in fs2 0.10, so using modify
-//             res <- limiter.worker await complete.modify(_ => true).as("done")
-//             _ <- limiter.shutDown
-//             state <- complete.get
-//           } yield res -> state
+      "report the original error if execution of the submitted job fails" in {
+        case class MyError() extends Exception
+        def prog =
+          for {
+            limiter <- Limiter.start[IO](1 every 1.seconds)
+            res <- limiter.worker await IO.raiseError[Int](new MyError)
+            _ <- limiter.shutDown
+          } yield res
 
-//         prog must returnValue { out: (String, Boolean) =>
-//           out._1 must beEqualTo("done")
-//           out._2 must beTrue
-//         }
-//       }
+        prog.unsafeRunSync must throwA[MyError]
+      }
 
-//       "report the original error if execution of the submitted job fails" in {
-//         case class MyError() extends Exception
-//         def prog =
-//           for {
-//             limiter <- Limiter.start(1 every 1.seconds)
-//             res <- limiter.worker await Task.fail(new MyError)
-//             _ <- limiter.shutDown
-//           } yield res
+    "when too many jobs have been submitted" should {
+      "reject new jobs immediately" in {
+        def prog =
+          for {
+            limiter <- Limiter.start[IO](1 every 10.seconds, n = 0)
+            res <- limiter.worker await IO.unit
+            _ <- limiter.shutDown
+          } yield res
 
-//         prog must failWith[MyError]
-//       }
-//     }
+        def prog2 =
+          for {
+            limiter <- Limiter.start[IO](1 every 10.seconds, n = 0)
+            _ <- limiter.worker submit IO.unit
+            _ <- limiter.shutDown
+          } yield ()
 
-//     "when too many jobs have been submitted" should {
-//       "reject new jobs immediately" in {
-//         def prog =
-//           for {
-//             limiter <- Limiter.start(1 every 10.seconds, n = 0)
-//             res <- limiter.worker await ().pure[Task]
-//             _ <- limiter.shutDown
-//           } yield res
+        prog.unsafeRunSync must throwA[LimitReachedException]
+        prog2.unsafeRunSync must throwA[LimitReachedException]
+      }
+    }
+  }
 
-//         def prog2 =
-//           for {
-//             limiter <- Limiter.start(1 every 10.seconds, n = 0)
-//             _ <- limiter.worker submit ().pure[Task]
-//             _ <- limiter.shutDown
-//           } yield ()
-
-//         prog must failWith[LimitReachedException]
-//         prog2 must failWith[LimitReachedException]
-//       }
-//     }
-//   }
-
-// }
+}

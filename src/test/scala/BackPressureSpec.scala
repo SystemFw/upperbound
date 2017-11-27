@@ -1,73 +1,71 @@
-// package upperbound
+package upperbound
 
-// import fs2.Stream
-// import scala.concurrent.duration._
+import fs2.Stream
 
-// import org.specs2.mutable.Specification
-// import org.specs2.matcher.TaskMatchers
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 
-// class BackPressureSpec
-//     extends Specification
-//     with TaskMatchers
-//     with TestScenarios {
+import org.specs2.mutable.Specification
 
-//   val samplingWindow = 5.seconds
-//   val description = "Backpressure"
+class BackPressureSpec(implicit ec: ExecutionContext)
+    extends Specification
+    with TestScenarios {
 
-//   import syntax.rate._
+  val samplingWindow = 5.seconds
+  val description = "Backpressure"
 
-//   // Due to its asynchronous/concurrent nature, the backoff
-//   // functionality cannot guarantee instantaneous propagation of rate
-//   // changes. The parameters in the test are tuned to guarantee that
-//   // changes consistently propagate exactly one job later, so that we
-//   // can make the test assertion deterministic.
-//   val T = 200
-//   val backOffConditions = TestingConditions(
-//     backOff = x => x,
-//     backPressure = BackPressure.never,
-//     desiredRate = 1 every T.millis,
-//     productionRate = 1 every 1.millis,
-//     producers = 1,
-//     jobsPerProducer = 100,
-//     jobCompletion = 25.millis,
-//     samplingWindow = samplingWindow
-//   )
+  import syntax.rate._
 
-//   "Backpressure" should {
-//     "follow the provided backOff function" in {
+  // Due to its asynchronous/concurrent nature, the backoff
+  // functionality cannot guarantee instantaneous propagation of rate
+  // changes. The parameters in the test are tuned to guarantee that
+  // changes consistently propagate exactly one job later, so that we
+  // can make the test assertion deterministic.
+  val T = 200
+  val backOffConditions = TestingConditions(
+    backOff = x => x,
+    backPressure = BackPressure.never,
+    desiredRate = 1 every T.millis,
+    productionRate = 1 every 1.millis,
+    producers = 1,
+    jobsPerProducer = 100,
+    jobCompletion = 25.millis,
+    samplingWindow = samplingWindow
+  )
 
-//       def linearBackOff: FiniteDuration => FiniteDuration = _ + T.millis
-//       def everyJob: BackPressure.Ack[Int] = _ => BackPressure(true)
+  "Backpressure" should {
+    "follow the provided backOff function" in {
 
-//       val conditions = backOffConditions.copy(
-//         backOff = linearBackOff,
-//         backPressure = everyJob
-//       )
+      def linearBackOff: FiniteDuration => FiniteDuration = _ + T.millis
+      def everyJob: BackPressure.Ack[Int] = _ => BackPressure(true)
 
-//       mkScenario(conditions) must returnValue { (res: Result) =>
-//         val backOff = res.jobExecutionMetrics.diffs.map(_ / T)
-//         val linear = Stream.iterate(1)(_ + 1).take(backOff.length).toVector
+      val conditions = backOffConditions.copy(
+        backOff = linearBackOff,
+        backPressure = everyJob
+      )
 
-//         backOff must beEqualTo(linear)
-//       }
-//     }
+      val res = mkScenario(conditions).unsafeRunSync
+      val measuredBackOff = res.jobExecutionMetrics.diffs.map(_ / T)
+      val linear = Stream.iterate(1)(_ + 1).take(measuredBackOff.length).toVector
 
-//     "only apply when jobs are signalling for it" in {
-//       def constantBackOff: FiniteDuration => FiniteDuration = _ => T.millis * 2
-//       def everyOtherJob: BackPressure.Ack[Int] =
-//         i => BackPressure(i.right.get % 2 == 0)
+      measuredBackOff must beEqualTo(linear)
+    }
 
-//       val conditions = backOffConditions.copy(
-//         backOff = constantBackOff,
-//         backPressure = everyOtherJob
-//       )
+    "only apply when jobs are signalling for it" in {
+      def constantBackOff: FiniteDuration => FiniteDuration = _ => T.millis * 2
+      def everyOtherJob: BackPressure.Ack[Int] =
+        i => BackPressure(i.right.get % 2 == 0)
 
-//       mkScenario(conditions) must returnValue { (res: Result) =>
-//         val backOff = res.jobExecutionMetrics.diffs.map(_ / T)
-//         val alternating = Stream(1, 2).repeat.take(backOff.length).toVector
+      val conditions = backOffConditions.copy(
+        backOff = constantBackOff,
+        backPressure = everyOtherJob
+      )
 
-//         backOff must beEqualTo(alternating)
-//       }
-//     }
-//   }
-// }
+      val res  = mkScenario(conditions).unsafeRunSync
+      val measuredBackOff = res.jobExecutionMetrics.diffs.map(_ / T)
+      val alternating = Stream(1, 2).repeat.take(measuredBackOff.length).toVector
+
+      measuredBackOff must beEqualTo(alternating)
+    }
+  }
+}
