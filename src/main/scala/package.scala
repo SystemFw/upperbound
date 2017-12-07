@@ -1,4 +1,3 @@
-import cats.Applicative
 import cats.effect.Effect
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -47,5 +46,5 @@ package object upperbound {
   /**
     * See [[core.Worker.noOp]]
     */
-  def testWorker[F[_]: Applicative]: Worker[F] = core.Worker.noOp
+  def testWorker[F[_]: Effect](implicit ec: ExecutionContext): Worker[F] = core.Worker.noOp
 }

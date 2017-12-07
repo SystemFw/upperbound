@@ -157,7 +157,7 @@ tests, but the logic you are testing might require a `Worker` when
 it's actually running. In this case, it's enough to pass in a stub
 implementation of `Worker` that contains whatever logic is needed for
 your tests. In particular, you can use `upperbound.testWorker` to get an
-instance that does no rate limiting, and only has synchronous methods.
+instance that does no rate limiting.
 
 ## Backpressure
 

@@ -3,7 +3,6 @@ package upperbound
 import fs2.{async, Pipe, Stream, Scheduler}
 import cats.effect.Effect
 
-import cats.Applicative
 import cats.syntax.functor._
 import cats.syntax.apply._
 import cats.syntax.applicative._
@@ -117,7 +116,7 @@ object core {
       * Creates a noOp worker, with no rate limiting and a synchronous
       * `submit` method. `pending` is always zero.
       */
-    def noOp[F[_]: Applicative]: Worker[F] = new Worker[F] {
+    def noOp[F[_]: Effect](implicit ec: ExecutionContext): Worker[F] = new Worker[F] {
       def submit[A](job: F[A],
                     priority: Int,
                     ack: BackPressure.Ack[A]): F[Unit] = job.void
