@@ -46,7 +46,8 @@ class BackPressureSpec(implicit ec: ExecutionContext)
 
       val res = mkScenario(conditions).unsafeRunSync
       val measuredBackOff = res.jobExecutionMetrics.diffs.map(_ / T)
-      val linear = Stream.iterate(1)(_ + 1).take(measuredBackOff.length).toVector
+      val linear =
+        Stream.iterate(1)(_ + 1).take(measuredBackOff.length).toVector
 
       measuredBackOff must beEqualTo(linear)
     }
@@ -61,9 +62,10 @@ class BackPressureSpec(implicit ec: ExecutionContext)
         backPressure = everyOtherJob
       )
 
-      val res  = mkScenario(conditions).unsafeRunSync
+      val res = mkScenario(conditions).unsafeRunSync
       val measuredBackOff = res.jobExecutionMetrics.diffs.map(_ / T)
-      val alternating = Stream(1, 2).repeat.take(measuredBackOff.length).toVector
+      val alternating =
+        Stream(1, 2).repeat.take(measuredBackOff.length).toVector
 
       measuredBackOff must beEqualTo(alternating)
     }

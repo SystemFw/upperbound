@@ -60,7 +60,7 @@ object model {
     def onError[E <: Throwable: ClassTag]: Ack[Any] =
       (_: Either[Throwable, _]) match {
         case Left(_: E) => BackPressure(true)
-        case _          => BackPressure(false)
+        case _ => BackPressure(false)
       }
 
     /**
@@ -68,7 +68,7 @@ object model {
       * condition
       */
     def onResult[A](cond: A => Boolean): Ack[A] = _ match {
-      case Left(_)  => BackPressure(false)
+      case Left(_) => BackPressure(false)
       case Right(r) => BackPressure(cond(r))
     }
   }

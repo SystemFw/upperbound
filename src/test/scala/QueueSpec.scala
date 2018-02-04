@@ -14,7 +14,9 @@ import queues.Queue
 import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck
 
-class QueueSpec(implicit ec: ExecutionContext) extends Specification with ScalaCheck {
+class QueueSpec(implicit ec: ExecutionContext)
+    extends Specification
+    with ScalaCheck {
   "An unbounded Queue" should {
 
     // Using property based testing for this assertion greatly
@@ -30,7 +32,9 @@ class QueueSpec(implicit ec: ExecutionContext) extends Specification with ScalaC
             result <- consumer.merge(producer)
           } yield result
 
-        concurrentProducerConsumer.runLog.unsafeRunSync must contain(fst, snd)
+        concurrentProducerConsumer.compile.toVector.unsafeRunSync must contain(
+          fst,
+          snd)
     }
 
     "dequeue the highest priority elements first" in prop {
@@ -77,7 +81,7 @@ class QueueSpec(implicit ec: ExecutionContext) extends Specification with ScalaC
 
   implicit class QueueOps[A](queue: Queue[IO, Option[A]]) {
     def dequeueAllF: IO[Vector[A]] =
-      queue.dequeueAll.unNoneTerminate.runLog
+      queue.dequeueAll.unNoneTerminate.compile.toVector
 
     def enqueueAllF(elems: Vector[(A, Int)]): IO[Unit] =
       Stream
@@ -85,9 +89,10 @@ class QueueSpec(implicit ec: ExecutionContext) extends Specification with ScalaC
         .noneTerminate
         .evalMap {
           case Some((e, p)) => queue.enqueue(e.some, p)
-          case None         => queue.enqueue(None, Int.MinValue)
+          case None => queue.enqueue(None, Int.MinValue)
         }
-        .run
+        .compile
+        .drain
   }
 
   def prog[A](input: Vector[(A, Int)]) =

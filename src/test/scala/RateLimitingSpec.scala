@@ -8,8 +8,7 @@ import org.scalactic.{Tolerance, TripleEquals}
 
 class RateLimitingSpec(implicit val ec: ExecutionContext)
     extends Specification
-    with TestScenarios
-  {
+    with TestScenarios {
 
   val samplingWindow = 5.seconds
   val description = "Rate limiting"

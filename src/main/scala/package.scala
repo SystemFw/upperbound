@@ -2,7 +2,6 @@ import cats.effect.Effect
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
-
 package object upperbound {
 
   type Rate = model.Rate
@@ -33,6 +32,7 @@ package object upperbound {
 
   type Limiter[F[_]] = core.Limiter[F]
   object Limiter {
+
     /**
       * See [[core.Limiter.start]]
       */
@@ -46,5 +46,6 @@ package object upperbound {
   /**
     * See [[core.Worker.noOp]]
     */
-  def testWorker[F[_]: Effect](implicit ec: ExecutionContext): Worker[F] = core.Worker.noOp
+  def testWorker[F[_]: Effect](implicit ec: ExecutionContext): Worker[F] =
+    core.Worker.noOp
 }

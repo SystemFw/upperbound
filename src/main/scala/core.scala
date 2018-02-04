@@ -8,6 +8,7 @@ import cats.syntax.apply._
 import cats.syntax.applicative._
 import cats.syntax.flatMap._
 import cats.syntax.applicativeError._
+import cats.syntax.monadError._
 
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
@@ -99,14 +100,11 @@ object core {
         )
 
       def await[A](job: F[A], priority: Int, ack: BackPressure.Ack[A]): F[A] =
-        async.ref[F, Either[Throwable, A]] flatMap { ref =>
-          val registerResult =
-            job.attempt.flatMap(r => ref.setSyncPure(r) as ack(r))
-
-          val submitAndAwait =
-            backend.enqueue(registerResult, priority) *> ref.get
-
-          submitAndAwait flatMap F.fromEither
+        async.promise[F, Either[Throwable, A]] flatMap { p =>
+          backend.enqueue(
+            job.attempt.flatTap(p.complete).map(ack),
+            priority
+          ) *> p.get.rethrow
         }
 
       def pending: F[Int] = backend.size
@@ -116,17 +114,18 @@ object core {
       * Creates a noOp worker, with no rate limiting and a synchronous
       * `submit` method. `pending` is always zero.
       */
-    def noOp[F[_]: Effect](implicit ec: ExecutionContext): Worker[F] = new Worker[F] {
-      def submit[A](job: F[A],
-                    priority: Int,
-                    ack: BackPressure.Ack[A]): F[Unit] = job.void
+    def noOp[F[_]: Effect](implicit ec: ExecutionContext): Worker[F] =
+      new Worker[F] {
+        def submit[A](job: F[A],
+                      priority: Int,
+                      ack: BackPressure.Ack[A]): F[Unit] = job.void
 
-      def await[A](job: F[A],
-                   priority: Int = 0,
-                   ack: BackPressure.Ack[A]): F[A] = job
+        def await[A](job: F[A],
+                     priority: Int = 0,
+                     ack: BackPressure.Ack[A]): F[A] = job
 
-      def pending: F[Int] = 0.pure[F]
-    }
+        def pending: F[Int] = 0.pure[F]
+      }
   }
 
   /**
@@ -180,8 +179,8 @@ object core {
               def exec(job: F[BackPressure]): F[Unit] =
                 async.fork {
                   job.map(_.slowDown) ifM (
-                    ifFalse = interval.setSyncPure(period),
-                    ifTrue = interval.modify(backOff).void
+                    ifTrue = interval.modify(backOff).void,
+                    ifFalse = interval.setSync(period)
                   )
                 }
 
@@ -200,7 +199,7 @@ object core {
                   .evalMap(exec)
                   .interruptWhen(stop)
 
-              async.fork(executor.run) as {
+              async.fork(executor.compile.drain) as {
                 new Limiter[F] {
                   def worker = Worker.create(queue)
                   def shutDown = stop.set(true) *> cleanup

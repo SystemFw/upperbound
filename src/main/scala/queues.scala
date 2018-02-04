@@ -66,7 +66,8 @@ object queues {
           def dequeue: F[A] =
             qref.modify(_.dequeued) flatMap {
               _.previous.dequeue
-                .fold(F.raiseError[A](new NoSuchElementException))(_.pure[F])
+                .map(_.pure[F])
+                .getOrElse(F.raiseError(new NoSuchElementException))
             }
 
           def size: F[Int] =
@@ -106,8 +107,8 @@ object queues {
           new Queue[F, A] {
             def enqueue(a: A, priority: Int): F[Unit] =
               permits.tryDecrement ifM (
-                ifFalse = F raiseError LimitReachedException(),
-                ifTrue = queue.enqueue(a, priority)
+                ifTrue = queue.enqueue(a, priority),
+                ifFalse = F.raiseError(LimitReachedException())
               )
 
             def dequeue: F[A] =
@@ -146,7 +147,5 @@ object queues {
           Order.by(_.insertionOrder)
         )
     }
-
   }
-
 }

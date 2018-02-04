@@ -10,7 +10,8 @@ import scala.concurrent.ExecutionContext
 
 import org.specs2.mutable.Specification
 
-class SubmissionSemanticsSpec(implicit val ec: ExecutionContext) extends Specification {
+class SubmissionSemanticsSpec(implicit val ec: ExecutionContext)
+    extends Specification {
 
   import syntax.rate._
 
@@ -23,7 +24,7 @@ class SubmissionSemanticsSpec(implicit val ec: ExecutionContext) extends Specifi
           for {
             complete <- async.refOf[IO, Boolean](false)
             limiter <- Limiter.start[IO](1 every 10.seconds)
-            _ <- limiter.worker submit complete.setSyncPure(true)
+            _ <- limiter.worker submit complete.setSync(true)
             _ <- limiter.shutDown
             res <- complete.get
           } yield res
@@ -39,7 +40,7 @@ class SubmissionSemanticsSpec(implicit val ec: ExecutionContext) extends Specifi
           for {
             complete <- async.refOf[IO, Boolean](false)
             limiter <- Limiter.start[IO](1 every 1.seconds)
-            res <- limiter.worker await complete.setSyncPure(true).as("done")
+            res <- limiter.worker await complete.setSync(true).as("done")
             _ <- limiter.shutDown
             state <- complete.get
           } yield res -> state
@@ -50,17 +51,17 @@ class SubmissionSemanticsSpec(implicit val ec: ExecutionContext) extends Specifi
       }
     }
 
-      "report the original error if execution of the submitted job fails" in {
-        case class MyError() extends Exception
-        def prog =
-          for {
-            limiter <- Limiter.start[IO](1 every 1.seconds)
-            res <- limiter.worker await IO.raiseError[Int](new MyError)
-            _ <- limiter.shutDown
-          } yield res
+    "report the original error if execution of the submitted job fails" in {
+      case class MyError() extends Exception
+      def prog =
+        for {
+          limiter <- Limiter.start[IO](1 every 1.seconds)
+          res <- limiter.worker await IO.raiseError[Int](new MyError)
+          _ <- limiter.shutDown
+        } yield res
 
-        prog.unsafeRunSync must throwA[MyError]
-      }
+      prog.unsafeRunSync must throwA[MyError]
+    }
 
     "when too many jobs have been submitted" should {
       "reject new jobs immediately" in {

@@ -83,7 +83,8 @@ trait TestScenarios extends BeforeAll {
             def job(i: Int) =
               record(startTimes) *> scheduler
                 .sleep[IO](t.jobCompletion)
-                .run *> i.pure[IO]
+                .compile
+                .drain *> i.pure[IO]
 
             def producer: Stream[IO, Unit] =
               Stream.range(0, t.jobsPerProducer).map(job) evalMap { x =>
@@ -106,10 +107,11 @@ trait TestScenarios extends BeforeAll {
                 .join(t.producers)
 
             for {
-              _ <- async.fork(concurrentProducers.run)
+              _ <- async.fork(concurrentProducers.compile.drain)
               _ <- scheduler
                 .sleep_[IO](t.samplingWindow)
-                .run *> limiter.shutDown
+                .compile
+                .drain *> limiter.shutDown
               p <- submissionTimes.get
               j <- startTimes.get
               _ <- cleanup
