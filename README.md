@@ -17,34 +17,9 @@ Look at the [CHANGELOG.md] for the latest release.
 
 ## Purity
 
-Everything in **bound** is a pure function, which allows for ease of
-reasoning and composability.
-
-TODO The library depends on fs2 and cats-effect, some familiarity is expected.
-
-A full discussion on purely functional programmming is out of scope
-for this document, the unfamiliar reader should consult:
- - [Purely functional IO](https://www.slideshare.net/InfoQ/purely-functional-io)
- - [An IO monad for cats](http://typelevel.org/blog/2017/05/02/io-monad-for-cats.html)
- - [Scalaz Task: the missing documentation](http://timperrett.com/2014/07/20/scalaz-task-the-missing-documentation/)
-
-On a practical level, it means that every function that would return
-`A` + have side effects is instead pure but returns an `F[A]`, which
-represents a computation that, *_when run_*, will have side effects,
-possibly asynchronously, possibly throwing exceptions.  Functions
-returning `F` are pure because nothing ever happens when an `F`
-is returned, effects only happen when the `F` is run.
-The key idea is that `F`s can be composed without actually having
-to run them using `flatMap`, `for comprehensions`, or the various
-other combinators (including functions for exception handling and
-concurrency), which in turn return other `F`s.
-In the end, your whole program will become one giant pure expression
-represented by an `F[A]`, which can be run _only once, at the end of
-the world_ (typically your main), to execute the effects.
-This approach allows us to reap all the benefits of functional
-programming while still having effectful programs that interact with
-the world.
-
+**upperbound** is completely pure, which allows for ease of reasoning
+and composability. On a practical level, this means that some
+familiarity with cats, cats-effect and fs2 is required.
 
 ## Usage
 
@@ -91,24 +66,23 @@ Following this approach, _your whole program_ will end up having type
 `Worker`. This is what `Limiter` is for:
 
 ``` scala
+import cats.effect.Effect
+
 trait Limiter[F[_]] {
   def worker: Worker[F]
   def shutDown: F[Unit])
 }
 
 object Limiter {
-  def start(maxRate: Rate)(implicit ec: ExecutionContext): F[Limiter]
+  def start[F[_]: Effect](maxRate: Rate)(implicit ec: ExecutionContext): F[Limiter]
 }
 ```
 You should only need `Limiter` at the end of your program, to assemble
 all the parts together. Imagine your program is defined as:
 
-TODO: parametric F?
-TODO: imports, import section
-TODO: tut
-
 ``` scala
 import upperbound._
+import cats.effect.IO
 
 case class YourWholeProgram(w: Worker[IO]) {
   def doStuff: IO[Unit] = {
@@ -121,6 +95,7 @@ you can then do:
 
 ``` scala
 import upperbound._, syntax.rate._
+import cats.effect.IO
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
