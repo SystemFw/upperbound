@@ -38,7 +38,7 @@ object model {
       * Decides when to signal backpressure given the result or error
       * of a job
       */
-    type Ack[A] = Either[Throwable, A] => BackPressure
+    type Ack[-A] = Either[Throwable, A] => BackPressure
 
     /**
       *  Never backpressure
