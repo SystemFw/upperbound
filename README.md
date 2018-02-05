@@ -3,9 +3,6 @@
 **upperbound** is a purely functional rate limiter. It
 allows you to submit jobs concurrently, which will then be started at
 a rate no higher than what you specify.
- 
-NOTE: The library is currently in the process of being migrated from
-fs2 0.9 + scalaz to fs2 0.10 + cats + cats-effect.
 
 ## Installation
 To get **upperbound**, add the following line to your `build.sbt`
@@ -116,7 +113,7 @@ object Main extends App {
 }
 ```
 How exactly you run `managed` might depend on the specific
-framework/lib you're using. TODO mention Stream.bracket
+framework/lib you're using. 
 
 Note: the `every` syntax for declaring `Rate`s requires
 
