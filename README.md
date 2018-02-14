@@ -96,12 +96,13 @@ import cats.effect.IO
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-val managed = for {
-  limiter <- Limiter.start[IO](100 every 1.minute)
-  res <- YourWholeProgram(limiter.worker).doStuff
-  _ <- client.shutdown
-} yield res
-
+object Edge {
+  val managed = for {
+    limiter <- Limiter.start[IO](100 every 1.minute)
+    res <- YourWholeProgram(limiter.worker).doStuff
+    _ <- client.shutdown
+  } yield res
+}
 ```
 `managed` is an `IO` that, when run, will start a `Limiter`, run it in
 parallel with your program, and shut it down when your program
@@ -109,7 +110,7 @@ terminates. This will typically be the last `IO` in your call chain,
 which means you can do:
 ``` scala
 object Main extends App {
- managed.unsafeRunSync
+  Edge.managed.unsafeRunSync
 }
 ```
 How exactly you run `managed` might depend on the specific
