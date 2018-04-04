@@ -1,5 +1,7 @@
 # upperbound
 
+[![Build Status](https://travis-ci.org/SystemFw/upperbound.svg?branch=master)](https://travis-ci.org/SystemFw/upperbound)
+
 **upperbound** is a purely functional rate limiter. It
 allows you to submit jobs concurrently, which will then be started at
 a rate no higher than what you specify.
