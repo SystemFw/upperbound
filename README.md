@@ -72,6 +72,7 @@ trait Limiter[F[_]] {
 
 object Limiter {
   def start[F[_]: Effect](maxRate: Rate)(implicit ec: ExecutionContext): F[Limiter]
+  def stream[F[_]: Effect](maxRate: Rate)(implicit ec: ExecutionContext): Stream[F, Limiter[F]]
 }
 ```
 You should only need `Limiter` at the end of your program, to assemble
@@ -92,29 +93,19 @@ you can then do:
 
 ``` scala
 import upperbound._, syntax.rate._
+import fs2.StreamApp
 import cats.effect.IO
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-object Edge {
-  val managed = for {
-    limiter <- Limiter.start[IO](100 every 1.minute)
-    res <- YourWholeProgram(limiter.worker).doStuff
-    _ <- client.shutdown
-  } yield res
+object Main extends StreamApp {
+  def stream(args: List[String], requestShutdown: IO[Unit]) : Stream[IO, ExitCode] =
+    for {
+      limiter <- Limiter.stream[IO](100 every 1.minute)
+      res <- YourWholeProgram(limiter.worker).doStuff
+    } yield res
 }
 ```
-`managed` is an `IO` that, when run, will start a `Limiter`, run it in
-parallel with your program, and shut it down when your program
-terminates. This will typically be the last `IO` in your call chain,
-which means you can do:
-``` scala
-object Main extends App {
-  Edge.managed.unsafeRunSync
-}
-```
-How exactly you run `managed` might depend on the specific
-framework/lib you're using. 
 
 Note: the `every` syntax for declaring `Rate`s requires
 
