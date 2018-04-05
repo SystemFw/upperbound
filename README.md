@@ -94,15 +94,17 @@ you can then do:
 ``` scala
 import upperbound._, syntax.rate._
 import fs2.StreamApp
+import fs2.StreamApp.ExitCode
+import fs2.Stream
 import cats.effect.IO
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-object Main extends StreamApp {
-  def stream(args: List[String], requestShutdown: IO[Unit]) : Stream[IO, ExitCode] =
+object Main extends StreamApp[IO] {
+  override def stream(args: List[String], requestShutdown: IO[Unit]) : Stream[IO, ExitCode] =
     for {
       limiter <- Limiter.stream[IO](100 every 1.minute)
-      res <- YourWholeProgram(limiter.worker).doStuff
+      res <- Stream.eval(YourWholeProgram(limiter.worker).doStuff).as(ExitCode.Success)
     } yield res
 }
 ```
