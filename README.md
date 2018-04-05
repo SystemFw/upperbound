@@ -10,7 +10,7 @@ To get **upperbound**, add the following line to your `build.sbt`
 ``` scala
 libraryDependencies += "org.systemfw" %% "upperbound" % "version"
 ```
-Look at the [CHANGELOG.md] for the latest release.
+Look at [the changelog](CHANGELOG.md) for the latest release.
 
 ## Purity
 
