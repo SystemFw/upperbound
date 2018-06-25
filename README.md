@@ -71,7 +71,7 @@ trait Limiter[F[_]] {
 }
 
 object Limiter {
-  def start[F[_]: Effect](maxRate: Rate)(implicit ec: ExecutionContext): F[Limiter]
+  def start[F[_]: Effect](maxRate: Rate)(implicit ec: ExecutionContext): F[Limiter[F]]
   def stream[F[_]: Effect](maxRate: Rate)(implicit ec: ExecutionContext): Stream[F, Limiter[F]]
 }
 ```
