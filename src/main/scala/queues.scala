@@ -1,17 +1,15 @@
 package upperbound
 
-import fs2.{Stream, async}
-import cats.effect.Effect
-
+import fs2.Stream
+import cats.effect.ConcurrentEffect
+import cats.effect.concurrent.{Ref, Semaphore}
 import cats.kernel.Order
 import cats.kernel.instances.long._
 import cats.kernel.instances.int._
-
 import cats.syntax.functor._
 import cats.syntax.apply._
 import cats.syntax.applicative._
 import cats.syntax.flatMap._
-
 import dogs.Heap
 
 import scala.concurrent.ExecutionContext
@@ -56,19 +54,19 @@ object queues {
       * Unbounded size.
       * `dequeue` immediately fails if the queue is empty
       */
-    def naive[F[_], A](implicit F: Effect[F],
+    def naive[F[_], A](implicit F: ConcurrentEffect[F],
                        ec: ExecutionContext): F[Queue[F, A]] =
-      async.refOf(IQueue.empty[A]) map { qref =>
+      Ref.of[F, IQueue[A]](IQueue.empty[A]) map { qref =>
         new Queue[F, A] {
           def enqueue(a: A, priority: Int): F[Unit] =
-            qref.modify(_.enqueue(a, priority)).void
+            qref.modify { q =>
+              q.enqueue(a, priority) -> q
+            }.void
 
           def dequeue: F[A] =
-            qref.modify(_.dequeued) flatMap {
-              _.previous.dequeue
-                .map(_.pure[F])
-                .getOrElse(F.raiseError(new NoSuchElementException))
-            }
+            qref.modify { q =>
+              q.dequeued -> q.dequeue.map(_.pure[F]).getOrElse(F.raiseError(new NoSuchElementException))
+            }.flatten
 
           def size: F[Int] =
             qref.get.map(_.queue.size)
@@ -79,16 +77,16 @@ object queues {
       * Unbounded size.
       * `dequeue` blocks on empty queue until an element is available.
       */
-    def unbounded[F[_], A](implicit F: Effect[F],
+    def unbounded[F[_], A](implicit F: ConcurrentEffect[F],
                            ec: ExecutionContext): F[Queue[F, A]] =
-      async.semaphore(0) flatMap { n =>
+      Semaphore(0) flatMap { n =>
         naive[F, A] map { queue =>
           new Queue[F, A] {
             def enqueue(a: A, priority: Int): F[Unit] =
-              queue.enqueue(a, priority) *> n.increment
+              queue.enqueue(a, priority) *> n.release
 
             def dequeue: F[A] =
-              n.decrement *> queue.dequeue
+              n.acquire *> queue.dequeue
 
             def size = queue.size
           }
@@ -100,19 +98,19 @@ object queues {
       * `dequeue` blocks on empty queue until an element is available.
       * `enqueue` immediately fails if the queue is full.
       */
-    def bounded[F[_], A](maxSize: Int)(implicit F: Effect[F],
+    def bounded[F[_], A](maxSize: Int)(implicit F: ConcurrentEffect[F],
                                        ec: ExecutionContext): F[Queue[F, A]] =
-      async.semaphore(maxSize.toLong) flatMap { permits =>
+      Semaphore(maxSize.toLong) flatMap { permits =>
         Queue.unbounded[F, A] map { queue =>
           new Queue[F, A] {
             def enqueue(a: A, priority: Int): F[Unit] =
-              permits.tryDecrement ifM (
+              permits.tryAcquire ifM (
                 ifTrue = queue.enqueue(a, priority),
                 ifFalse = F.raiseError(LimitReachedException())
               )
 
             def dequeue: F[A] =
-              queue.dequeue <* permits.increment
+              queue.dequeue <* permits.release
 
             def size = queue.size
           }
@@ -136,7 +134,7 @@ object queues {
   }
 
   object IQueue {
-    def empty[A] = IQueue(Heap.empty[Rank[A]], 0)
+    def empty[A] = IQueue[A](Heap.empty[queues.IQueue.Rank[A]], 0)
 
     case class Rank[A](a: A, priority: Int, insertionOrder: Long = 0)
 

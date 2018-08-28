@@ -1,15 +1,18 @@
 package upperbound
 
+import cats.effect.{ConcurrentEffect, IO, Timer}
 import fs2.Stream
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-
 import org.specs2.mutable.Specification
 
 class BackPressureSpec(implicit ec: ExecutionContext)
     extends Specification
     with TestScenarios {
+
+  implicit val Timer: Timer[IO] = IO.timer(ec)
+  implicit val ConcurrentEffect: ConcurrentEffect[IO] = IO.ioConcurrentEffect(IO.contextShift(ec))
 
   val samplingWindow = 5.seconds
   val description = "Backpressure"

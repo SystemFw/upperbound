@@ -1,17 +1,15 @@
 package upperbound
 
-import fs2.{async, Pipe, Scheduler, Stream}
-import fs2.async.Ref
-import cats.effect.IO
-
+import fs2.{Pipe, Stream}
+import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.effect.concurrent.Ref
 import cats.syntax.functor._
 import cats.syntax.apply._
 import cats.syntax.applicative._
 
 import scala.collection.immutable.Queue
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.ExecutionContext //.Implicits.global
-
+import scala.concurrent.ExecutionContext
 import org.specs2.specification.BeforeAll
 
 trait TestScenarios extends BeforeAll {
@@ -68,59 +66,51 @@ trait TestScenarios extends BeforeAll {
   )
 
   def mkScenario(t: TestingConditions)(
-      implicit ec: ExecutionContext): IO[Result] =
-    Scheduler.allocate[IO](2) flatMap { s =>
-      async.refOf[IO, Vector[Long]](Vector.empty) flatMap { submissionTimes =>
-        async.refOf[IO, Vector[Long]](Vector.empty) flatMap { startTimes =>
-          Limiter.start[IO](t.desiredRate, t.backOff) flatMap { limiter =>
-            val (scheduler, cleanup) = s
+      implicit Timer: Timer[IO],
+      ConcurrentEffect: ConcurrentEffect[IO],
+      ec: ExecutionContext): IO[Result] =
+    Ref.of[IO, Vector[Long]](Vector.empty) flatMap { submissionTimes =>
+      Ref.of[IO, Vector[Long]](Vector.empty) flatMap { startTimes =>
+        Limiter.start[IO](t.desiredRate, t.backOff) flatMap { limiter =>
 
-            def record(destination: Ref[IO, Vector[Long]]): IO[Unit] =
-              IO(System.currentTimeMillis) flatMap { time =>
-                destination.modify(times => time +: times).void
-              }
+          def record(destination: Ref[IO, Vector[Long]]): IO[Unit] =
+            IO(System.currentTimeMillis) flatMap { time =>
+              destination.modify(times => (time +: times) -> times).void
+            }
 
-            def job(i: Int) =
-              record(startTimes) *> scheduler
-                .sleep[IO](t.jobCompletion)
-                .compile
-                .drain *> i.pure[IO]
+          def job(i: Int) =
+            record(startTimes) *> Timer.sleep(t.jobCompletion) *> i.pure[IO]
 
-            def producer: Stream[IO, Unit] =
-              Stream.range(0, t.jobsPerProducer).map(job) evalMap { x =>
-                record(submissionTimes) *> limiter.worker.submit(
-                  job = x,
-                  priority = 0,
-                  ack = t.backPressure)
-              }
+          def producer: Stream[IO, Unit] =
+            Stream.range(0, t.jobsPerProducer).map(job) evalMap { x =>
+              record(submissionTimes) *> limiter.worker.submit(
+                job = x,
+                priority = 0,
+                ack = t.backPressure)
+            }
 
-            def pulse[B]: Pipe[IO, B, B] =
-              in =>
-                scheduler
-                  .awakeEvery[IO](t.productionRate.period)
-                  .zip(in)
-                  .map(_._2)
+          def pulse[B]: Pipe[IO, B, B] =
+            in =>
+              Stream
+                .awakeEvery[IO](t.productionRate.period)
+                .zip(in)
+                .map(_._2)
 
-            def concurrentProducers: Stream[IO, Unit] =
-              Stream(producer through pulse).repeat
-                .take(t.producers)
-                .join(t.producers)
+          def concurrentProducers: Stream[IO, Unit] =
+            Stream(producer through pulse).repeat
+              .take(t.producers)
+              .parJoin(t.producers)
 
-            for {
-              _ <- async.fork(concurrentProducers.compile.drain)
-              _ <- scheduler
-                .sleep_[IO](t.samplingWindow)
-                .compile
-                .drain *> limiter.shutDown
-              p <- submissionTimes.get
-              j <- startTimes.get
-              _ <- cleanup
-            } yield
-              Result(
-                producerMetrics = Metric.from(p.sorted),
-                jobExecutionMetrics = Metric.from(j.sorted)
-              )
-          }
+          for {
+            _ <- ConcurrentEffect.start(concurrentProducers.compile.drain).void
+            _ <- Timer.sleep(t.samplingWindow) *> limiter.shutDown
+            p <- submissionTimes.get
+            j <- startTimes.get
+          } yield
+            Result(
+              producerMetrics = Metric.from(p.sorted),
+              jobExecutionMetrics = Metric.from(j.sorted)
+            )
         }
       }
     }
