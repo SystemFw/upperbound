@@ -134,7 +134,7 @@ object queues {
   }
 
   object IQueue {
-    def empty[A] = IQueue[A](Heap.empty[queues.IQueue.Rank[A]], 0)
+    def empty[A] = IQueue[A](Heap.empty[Rank[A]], 0)
 
     case class Rank[A](a: A, priority: Int, insertionOrder: Long = 0)
 
