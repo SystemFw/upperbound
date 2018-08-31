@@ -1,7 +1,8 @@
 package upperbound
 
+import cats.Applicative
 import fs2.{Pipe, Stream, async}
-import cats.effect.{Concurrent, ConcurrentEffect, Timer}
+import cats.effect.{Concurrent, Timer}
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.syntax.functor._
 import cats.syntax.apply._
@@ -11,7 +12,6 @@ import cats.syntax.applicativeError._
 import cats.syntax.monadError._
 
 import scala.concurrent.duration._
-import scala.concurrent.ExecutionContext
 import queues.Queue
 
 object core {
@@ -112,7 +112,7 @@ object core {
       * Creates a noOp worker, with no rate limiting and a synchronous
       * `submit` method. `pending` is always zero.
       */
-    def noOp[F[_]: Concurrent](implicit ec: ExecutionContext): Worker[F] =
+    def noOp[F[_]: Applicative]: Worker[F] =
       new Worker[F] {
         def submit[A](job: F[A],
                       priority: Int,
@@ -165,8 +165,7 @@ object core {
         period: FiniteDuration,
         backOff: FiniteDuration => FiniteDuration,
         n: Int)(implicit Timer: Timer[F],
-                ConcurrentEffect: ConcurrentEffect[F],
-                ec: ExecutionContext): F[Limiter[F]] =
+                Concurrent: Concurrent[F]): F[Limiter[F]] =
       Queue.bounded[F, F[BackPressure]](n) flatMap { queue =>
         async.signalOf[F, Boolean](false) flatMap { stop =>
           Ref.of[F, FiniteDuration](period) flatMap { interval =>
@@ -175,7 +174,7 @@ object core {
             // from the queue. It also means that a failed `job` doesn't
             // cause the overall processing to fail
             def exec(job: F[BackPressure]): F[Unit] =
-              ConcurrentEffect.start {
+              Concurrent.start {
                 job.map(_.slowDown) ifM (
                   ifTrue = interval.modify(i => backOff(i) -> i).void,
                   ifFalse = interval.set(period)
@@ -197,10 +196,10 @@ object core {
                 .evalMap(exec)
                 .interruptWhen(stop)
 
-            ConcurrentEffect.start(executor.compile.drain).void as {
+            Concurrent.start(executor.compile.drain).void as {
               new Limiter[F] {
                 def worker = Worker.create(queue)
-                def shutDown = stop.set(true) *> ConcurrentEffect.unit
+                def shutDown = stop.set(true)
               }
             }
           }

@@ -1,7 +1,7 @@
 package upperbound
 
 import fs2.{Pipe, Stream}
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.effect.{Concurrent, IO, Timer}
 import cats.effect.concurrent.Ref
 import cats.syntax.functor._
 import cats.syntax.apply._
@@ -67,7 +67,7 @@ trait TestScenarios extends BeforeAll {
 
   def mkScenario(t: TestingConditions)(
       implicit Timer: Timer[IO],
-      ConcurrentEffect: ConcurrentEffect[IO],
+      Concurrent: Concurrent[IO],
       ec: ExecutionContext): IO[Result] =
     Ref.of[IO, Vector[Long]](Vector.empty) flatMap { submissionTimes =>
       Ref.of[IO, Vector[Long]](Vector.empty) flatMap { startTimes =>
@@ -102,7 +102,7 @@ trait TestScenarios extends BeforeAll {
               .parJoin(t.producers)
 
           for {
-            _ <- ConcurrentEffect.start(concurrentProducers.compile.drain).void
+            _ <- Concurrent.start(concurrentProducers.compile.drain).void
             _ <- Timer.sleep(t.samplingWindow) *> limiter.shutDown
             p <- submissionTimes.get
             j <- startTimes.get

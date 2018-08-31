@@ -1,6 +1,6 @@
 package upperbound
 
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.effect.{ContextShift, IO, Timer}
 import cats.effect.concurrent.Ref
 import cats.syntax.functor._
 
@@ -14,7 +14,7 @@ class SubmissionSemanticsSpec(implicit val ec: ExecutionContext)
   import syntax.rate._
 
   implicit val Timer: Timer[IO] = IO.timer(ec)
-  implicit val ConcurrentEffect: ConcurrentEffect[IO] = IO.ioConcurrentEffect(IO.contextShift(ec))
+  implicit val ContextShift: ContextShift[IO] = IO.contextShift(ec)
 
   "A worker" >> {
 

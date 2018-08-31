@@ -1,7 +1,7 @@
 package upperbound
 
 import fs2.Stream
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.apply._
 import cats.syntax.applicative._
 import cats.syntax.option._
@@ -16,7 +16,7 @@ class QueueSpec(implicit ec: ExecutionContext)
     with ScalaCheck {
 
   implicit val Timer: Timer[IO] = IO.timer(ec)
-  implicit val ConcurrentEffect: ConcurrentEffect[IO] = IO.ioConcurrentEffect(IO.contextShift(ec))
+  implicit val ContextShift: ContextShift[IO] = IO.contextShift(ec)
 
   "An unbounded Queue" should {
 

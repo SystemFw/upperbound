@@ -1,7 +1,7 @@
 package upperbound
 
 import fs2.Stream
-import cats.effect.ConcurrentEffect
+import cats.effect.Concurrent
 import cats.effect.concurrent.{Ref, Semaphore}
 import cats.kernel.Order
 import cats.kernel.instances.long._
@@ -11,8 +11,6 @@ import cats.syntax.apply._
 import cats.syntax.applicative._
 import cats.syntax.flatMap._
 import dogs.Heap
-
-import scala.concurrent.ExecutionContext
 
 object queues {
 
@@ -54,8 +52,7 @@ object queues {
       * Unbounded size.
       * `dequeue` immediately fails if the queue is empty
       */
-    def naive[F[_], A](implicit F: ConcurrentEffect[F],
-                       ec: ExecutionContext): F[Queue[F, A]] =
+    def naive[F[_], A](implicit F: Concurrent[F]): F[Queue[F, A]] =
       Ref.of[F, IQueue[A]](IQueue.empty[A]) map { qref =>
         new Queue[F, A] {
           def enqueue(a: A, priority: Int): F[Unit] =
@@ -77,8 +74,7 @@ object queues {
       * Unbounded size.
       * `dequeue` blocks on empty queue until an element is available.
       */
-    def unbounded[F[_], A](implicit F: ConcurrentEffect[F],
-                           ec: ExecutionContext): F[Queue[F, A]] =
+    def unbounded[F[_], A](implicit F: Concurrent[F]): F[Queue[F, A]] =
       Semaphore(0) flatMap { n =>
         naive[F, A] map { queue =>
           new Queue[F, A] {
@@ -98,8 +94,7 @@ object queues {
       * `dequeue` blocks on empty queue until an element is available.
       * `enqueue` immediately fails if the queue is full.
       */
-    def bounded[F[_], A](maxSize: Int)(implicit F: ConcurrentEffect[F],
-                                       ec: ExecutionContext): F[Queue[F, A]] =
+    def bounded[F[_], A](maxSize: Int)(implicit F: Concurrent[F]): F[Queue[F, A]] =
       Semaphore(maxSize.toLong) flatMap { permits =>
         Queue.unbounded[F, A] map { queue =>
           new Queue[F, A] {

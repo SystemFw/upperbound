@@ -1,5 +1,6 @@
-import cats.effect.{ConcurrentEffect, Timer}
-import scala.concurrent.ExecutionContext
+import cats.Applicative
+import cats.effect.{Concurrent, Timer}
+
 import scala.concurrent.duration._
 import fs2.Stream
 
@@ -37,24 +38,24 @@ package object upperbound {
     /**
       * See [[core.Limiter.start]]
       */
-    def start[F[_]: ConcurrentEffect: Timer](
+    def start[F[_]: Concurrent: Timer](
         maxRate: Rate,
         backOff: FiniteDuration => FiniteDuration = identity,
-        n: Int = Int.MaxValue)(implicit ec: ExecutionContext): F[Limiter[F]] =
+        n: Int = Int.MaxValue): F[Limiter[F]] =
       core.Limiter.start[F](maxRate.period, backOff, n)
 
     /**
       * Produces a singleton Stream, emitting a new Limiter with the same semantics as [[core.Limiter.start]].
       * The instance is bracketed to clean up after use so calling `.shutdown` is no required.
       */
-    def stream[F[_]: ConcurrentEffect: Timer](maxRate: Rate,
+    def stream[F[_]: Concurrent: Timer](maxRate: Rate,
                      backOff: FiniteDuration => FiniteDuration = identity,
-                     n: Int = Int.MaxValue)(implicit ec: ExecutionContext): Stream[F, Limiter[F]] = Stream.bracket(Limiter.start(maxRate, backOff, n))(_.shutDown)
+                     n: Int = Int.MaxValue): Stream[F, Limiter[F]] = Stream.bracket(Limiter.start(maxRate, backOff, n))(_.shutDown)
   }
 
   /**
     * See [[core.Worker.noOp]]
     */
-  def testWorker[F[_]: ConcurrentEffect](implicit ec: ExecutionContext): Worker[F] =
+  def testWorker[F[_]: Applicative]: Worker[F] =
     core.Worker.noOp
 }
