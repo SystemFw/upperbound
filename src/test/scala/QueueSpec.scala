@@ -1,22 +1,23 @@
 package upperbound
 
 import fs2.Stream
-import cats.effect.IO
-
+import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.apply._
 import cats.syntax.applicative._
 import cats.syntax.option._
 
 import scala.concurrent.ExecutionContext
-
 import queues.Queue
-
 import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck
 
 class QueueSpec(implicit ec: ExecutionContext)
     extends Specification
     with ScalaCheck {
+
+  implicit val Timer: Timer[IO] = IO.timer(ec)
+  implicit val ContextShift: ContextShift[IO] = IO.contextShift(ec)
+
   "An unbounded Queue" should {
 
     // Using property based testing for this assertion greatly

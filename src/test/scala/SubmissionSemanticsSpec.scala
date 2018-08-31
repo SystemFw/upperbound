@@ -1,19 +1,20 @@
 package upperbound
 
-import fs2.async
-import cats.effect.IO
-
+import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.concurrent.Ref
 import cats.syntax.functor._
 
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
-
 import org.specs2.mutable.Specification
 
 class SubmissionSemanticsSpec(implicit val ec: ExecutionContext)
     extends Specification {
 
   import syntax.rate._
+
+  implicit val Timer: Timer[IO] = IO.timer(ec)
+  implicit val ContextShift: ContextShift[IO] = IO.contextShift(ec)
 
   "A worker" >> {
 
@@ -22,9 +23,9 @@ class SubmissionSemanticsSpec(implicit val ec: ExecutionContext)
       "continue execution immediately" in {
         def prog =
           for {
-            complete <- async.refOf[IO, Boolean](false)
+            complete <- Ref.of[IO, Boolean](false)
             limiter <- Limiter.start[IO](1 every 10.seconds)
-            _ <- limiter.worker submit complete.setSync(true)
+            _ <- limiter.worker submit complete.set(true)
             _ <- limiter.shutDown
             res <- complete.get
           } yield res
@@ -38,9 +39,9 @@ class SubmissionSemanticsSpec(implicit val ec: ExecutionContext)
       "complete when the result of the submitted job is ready" in {
         def prog =
           for {
-            complete <- async.refOf[IO, Boolean](false)
+            complete <- Ref.of[IO, Boolean](false)
             limiter <- Limiter.start[IO](1 every 1.seconds)
-            res <- limiter.worker await complete.setSync(true).as("done")
+            res <- limiter.worker await complete.set(true).as("done")
             _ <- limiter.shutDown
             state <- complete.get
           } yield res -> state

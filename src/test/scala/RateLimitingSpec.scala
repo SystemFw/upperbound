@@ -1,14 +1,18 @@
 package upperbound
 
+import cats.effect.{ContextShift, IO, Timer}
+
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-
 import org.specs2.mutable.Specification
 import org.scalactic.{Tolerance, TripleEquals}
 
 class RateLimitingSpec(implicit val ec: ExecutionContext)
     extends Specification
     with TestScenarios {
+
+  implicit val Timer: Timer[IO] = IO.timer(ec)
+  implicit val ContextShift: ContextShift[IO] = IO.contextShift(ec)
 
   val samplingWindow = 5.seconds
   val description = "Rate limiting"
