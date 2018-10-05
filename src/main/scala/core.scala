@@ -1,16 +1,9 @@
 package upperbound
 
-import cats.Applicative
-import fs2.{Pipe, Stream}
-import fs2.concurrent.SignallingRef
-import cats.effect.{Concurrent, Timer}
-import cats.effect.concurrent.{Deferred, Ref}
-import cats.syntax.functor._
-import cats.syntax.apply._
-import cats.syntax.applicative._
-import cats.syntax.flatMap._
-import cats.syntax.applicativeError._
-import cats.syntax.monadError._
+import cats._, implicits._
+import cats.effect._, concurrent._
+import cats.effect.implicits._
+import fs2._, fs2.concurrent.SignallingRef
 
 import scala.concurrent.duration._
 import queues.Queue
@@ -197,7 +190,7 @@ object core {
                 .evalMap(exec)
                 .interruptWhen(stop)
 
-            Concurrent.start(executor.compile.drain).void as {
+            executor.compile.drain.start.void as {
               new Limiter[F] {
                 def worker = Worker.create(queue)
                 def shutDown = stop.set(true)

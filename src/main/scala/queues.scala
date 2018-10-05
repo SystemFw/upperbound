@@ -1,16 +1,9 @@
 package upperbound
 
-import fs2.Stream
-import cats.effect.Concurrent
-import cats.effect.concurrent.{Ref, Semaphore}
-import cats.kernel.Order
-import cats.kernel.instances.long._
-import cats.kernel.instances.int._
-import cats.syntax.functor._
-import cats.syntax.apply._
-import cats.syntax.applicative._
-import cats.syntax.flatMap._
-import dogs.Heap
+import cats._, implicits._
+import cats.effect._,  concurrent._
+import fs2._
+import cats.collections.Heap
 
 object queues {
 
