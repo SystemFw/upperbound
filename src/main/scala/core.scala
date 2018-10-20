@@ -1,7 +1,8 @@
 package upperbound
 
 import cats.Applicative
-import fs2.{Pipe, Stream, async}
+import fs2.{Pipe, Stream}
+import fs2.concurrent.SignallingRef
 import cats.effect.{Concurrent, Timer}
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.syntax.functor._
@@ -167,7 +168,7 @@ object core {
         n: Int)(implicit Timer: Timer[F],
                 Concurrent: Concurrent[F]): F[Limiter[F]] =
       Queue.bounded[F, F[BackPressure]](n) flatMap { queue =>
-        async.signalOf[F, Boolean](false) flatMap { stop =>
+        SignallingRef[F, Boolean](false) flatMap { stop =>
           Ref.of[F, FiniteDuration](period) flatMap { interval =>
             // `job` needs to be executed asynchronously so that long
             // running jobs don't interfere with the frequency of pulling
