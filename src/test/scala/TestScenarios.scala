@@ -1,30 +1,15 @@
 package upperbound
 
-import fs2.{Pipe, Stream}
-import cats.effect.{Concurrent, IO, Timer}
+import fs2._
+import cats.effect._
 import cats.effect.concurrent.Ref
-import cats.syntax.functor._
-import cats.syntax.apply._
-import cats.syntax.applicative._
+import cats.effect.implicits._
+import cats.syntax.all._
 
 import scala.collection.immutable.Queue
-import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.ExecutionContext
-import org.specs2.specification.BeforeAll
+import scala.concurrent.duration._
 
-trait TestScenarios extends BeforeAll {
-
-  def samplingWindow: FiniteDuration
-  def description: String
-
-  def beforeAll = println {
-    s"""
-    |=============
-    | $description tests running. Sampling window: $samplingWindow
-    |=============
-   """.stripMargin('|')
-  }
-
+object TestScenarios {
   case class TestingConditions(
       desiredRate: Rate,
       backOff: FiniteDuration => FiniteDuration,
@@ -65,23 +50,20 @@ trait TestScenarios extends BeforeAll {
       jobExecutionMetrics: Metric
   )
 
-  def mkScenario(t: TestingConditions)(
-      implicit Timer: Timer[IO],
-      Concurrent: Concurrent[IO],
-      ec: ExecutionContext): IO[Result] =
-    Ref.of[IO, Vector[Long]](Vector.empty) flatMap { submissionTimes =>
-      Ref.of[IO, Vector[Long]](Vector.empty) flatMap { startTimes =>
-        Limiter.start[IO](t.desiredRate, t.backOff) flatMap { limiter =>
+  def mkScenario[F[_]: Concurrent](t: TestingConditions)(implicit T: Timer[F]): F[Result] =
+    Ref[F].of(Vector.empty[Long]) flatMap { submissionTimes =>
+      Ref[F].of(Vector.empty[Long]) flatMap { startTimes =>
+        Limiter.start[F](t.desiredRate, t.backOff) flatMap { limiter =>
 
-          def record(destination: Ref[IO, Vector[Long]]): IO[Unit] =
-            IO(System.currentTimeMillis) flatMap { time =>
-              destination.modify(times => (time +: times) -> times).void
+          def record(destination: Ref[F, Vector[Long]]): F[Unit] =
+            T.clock.monotonic(MILLISECONDS) flatMap { time =>
+              destination.update(times => time +: times)
             }
 
           def job(i: Int) =
-            record(startTimes) *> Timer.sleep(t.jobCompletion) *> i.pure[IO]
+            record(startTimes) *> T.sleep(t.jobCompletion).as(i)
 
-          def producer: Stream[IO, Unit] =
+          def producer: Stream[F, Unit] =
             Stream.range(0, t.jobsPerProducer).map(job) evalMap { x =>
               record(submissionTimes) *> limiter.worker.submit(
                 job = x,
@@ -89,21 +71,16 @@ trait TestScenarios extends BeforeAll {
                 ack = t.backPressure)
             }
 
-          def pulse[B]: Pipe[IO, B, B] =
-            in =>
-              Stream
-                .awakeEvery[IO](t.productionRate.period)
-                .zip(in)
-                .map(_._2)
+          def pulse = Stream.fixedRate[F](t.productionRate.period)
 
-          def concurrentProducers: Stream[IO, Unit] =
-            Stream(producer through pulse).repeat
+          def concurrentProducers: Stream[F, Unit] =
+            Stream(producer zipLeft pulse).repeat
               .take(t.producers)
               .parJoin(t.producers)
 
           for {
-            _ <- Concurrent.start(concurrentProducers.compile.drain).void
-            _ <- Timer.sleep(t.samplingWindow) *> limiter.shutDown
+            _ <- concurrentProducers.compile.drain.start.void
+            _ <- T.sleep(t.samplingWindow) *> limiter.shutDown
             p <- submissionTimes.get
             j <- startTimes.get
           } yield

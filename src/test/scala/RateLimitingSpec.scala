@@ -1,26 +1,21 @@
 package upperbound
 
-import cats.effect.{ContextShift, IO, Timer}
-
-import scala.concurrent.ExecutionContext
+import cats.effect._
 import scala.concurrent.duration._
-import org.specs2.mutable.Specification
-import org.scalactic.{Tolerance, TripleEquals}
 
-class RateLimitingSpec(implicit val ec: ExecutionContext)
-    extends Specification
-    with TestScenarios {
+import syntax.rate._
 
-  implicit val Timer: Timer[IO] = IO.timer(ec)
-  implicit val ContextShift: ContextShift[IO] = IO.contextShift(ec)
+import org.scalactic.Tolerance
 
-  val samplingWindow = 5.seconds
-  val description = "Rate limiting"
+class RateLimitingSpec extends BaseSpec {
+  val samplingWindow = 10.seconds
+  import TestScenarios._
 
-  import syntax.rate._
+  "Limiter" - {
+    "multiple fast producers, fast non-failing jobs" in {
+      val E = new Env
+      import E._
 
-  "Limiter" >> {
-    "multiple fast producers, fast non-failing jobs" >> {
       val conditions = TestingConditions(
         desiredRate = 1 every 200.millis,
         backOff = _ => 0.millis,
@@ -32,17 +27,18 @@ class RateLimitingSpec(implicit val ec: ExecutionContext)
         samplingWindow = samplingWindow
       )
 
-      import Tolerance._, TripleEquals._
+      val res = mkScenario[IO](conditions).unsafeToFuture
+      env.tick(samplingWindow)
 
-      val res = mkScenario(conditions).unsafeRunSync
-      List(
-        res.producerMetrics.mean === 3d +- 3d,
-        res.jobExecutionMetrics.mean === 205d +- 5d,
-        res.jobExecutionMetrics.undershoot >= 200l
-      ).forall(x => x)
+      res.map { r =>
+        assert(r.jobExecutionMetrics.diffs.forall(_  === 200L))
+      }
     }
 
-    "slow producer, no unnecessary delays" >> {
+    "slow producer, no unnecessary delays" in {
+      val E = new Env
+      import E._
+
       val conditions = TestingConditions(
         desiredRate = 1 every 200.millis,
         backOff = _ => 0.millis,
@@ -54,17 +50,15 @@ class RateLimitingSpec(implicit val ec: ExecutionContext)
         samplingWindow = samplingWindow
       )
 
-      import Tolerance._, TripleEquals._
+      import Tolerance._
 
-      val res = mkScenario(conditions).unsafeRunSync
+      val res = mkScenario[IO](conditions).unsafeToFuture
+      env.tick(samplingWindow)
 
-      val noDelays =
-        res.producerMetrics.diffs
-          .zip(res.jobExecutionMetrics.diffs)
-          .map { case (x, y) => x === y +- 3L }
-          .forall(x => x)
-
-      res.producerMetrics.mean === 300d +- 15d && noDelays
+      res.map { r =>
+        // TODO why the first two are faster?
+        assert(r.jobExecutionMetrics.diffs.drop(2).forall(_ === 300L))
+      }
     }
   }
 }

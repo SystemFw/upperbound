@@ -1,26 +1,19 @@
 package upperbound
 
-import cats.effect.{ContextShift, IO, Timer}
-import cats.effect.concurrent.Ref
-import cats.syntax.functor._
-
+import cats.syntax.all._
+import cats.effect._, concurrent.Ref
 import scala.concurrent.duration._
-import scala.concurrent.ExecutionContext
-import org.specs2.mutable.Specification
 
-class SubmissionSemanticsSpec(implicit val ec: ExecutionContext)
-    extends Specification {
+import syntax.rate._
 
-  import syntax.rate._
+class SubmissionSemanticsSpec extends BaseSpec {
+  import DefaultEnv._
 
-  implicit val Timer: Timer[IO] = IO.timer(ec)
-  implicit val ContextShift: ContextShift[IO] = IO.contextShift(ec)
+  "A worker" - {
 
-  "A worker" >> {
+    "when using fire-and-forget semantics" - {
 
-    "when using fire-and-forget semantics" should {
-
-      "continue execution immediately" in {
+      "should continue execution immediately" in {
         def prog =
           for {
             complete <- Ref.of[IO, Boolean](false)
@@ -30,13 +23,15 @@ class SubmissionSemanticsSpec(implicit val ec: ExecutionContext)
             res <- complete.get
           } yield res
 
-        prog.unsafeRunSync must beFalse
+        val res = prog.unsafeRunSync
+
+        assert(res === false)
       }
     }
 
-    "when using await semantics" should {
+    "when using await semantics" - {
 
-      "complete when the result of the submitted job is ready" in {
+      "should complete when the result of the submitted job is ready" in {
         def prog =
           for {
             complete <- Ref.of[IO, Boolean](false)
@@ -46,13 +41,13 @@ class SubmissionSemanticsSpec(implicit val ec: ExecutionContext)
             state <- complete.get
           } yield res -> state
 
-        val out = prog.unsafeRunSync
-        out._1 must beEqualTo("done")
-        out._2 must beTrue
-      }
-    }
+        val (res, state) = prog.unsafeRunSync
 
-    "report the original error if execution of the submitted job fails" in {
+        assert(res === "done")
+        assert(state === true)
+      }
+    
+    "should report the original error if execution of the submitted job fails" in {
       case class MyError() extends Exception
       def prog =
         for {
@@ -61,11 +56,12 @@ class SubmissionSemanticsSpec(implicit val ec: ExecutionContext)
           _ <- limiter.shutDown
         } yield res
 
-      prog.unsafeRunSync must throwA[MyError]
+      assertThrows[MyError](prog.unsafeRunSync)
+    }
     }
 
-    "when too many jobs have been submitted" should {
-      "reject new jobs immediately" in {
+    "when too many jobs have been submitted" - {
+      "should reject new jobs immediately" in {
         def prog =
           for {
             limiter <- Limiter.start[IO](1 every 10.seconds, n = 0)
@@ -80,8 +76,8 @@ class SubmissionSemanticsSpec(implicit val ec: ExecutionContext)
             _ <- limiter.shutDown
           } yield ()
 
-        prog.unsafeRunSync must throwA[LimitReachedException]
-        prog2.unsafeRunSync must throwA[LimitReachedException]
+        assertThrows[LimitReachedException](prog.unsafeRunSync)
+        assertThrows[LimitReachedException](prog2.unsafeRunSync)
       }
     }
   }

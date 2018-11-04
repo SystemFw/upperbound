@@ -1,29 +1,21 @@
 package upperbound
 
 import fs2.Stream
-import cats.effect.{ContextShift, IO, Timer}
-import cats.syntax.apply._
-import cats.syntax.applicative._
-import cats.syntax.option._
+import cats.effect._
+import cats.syntax.all._
 
-import scala.concurrent.ExecutionContext
 import queues.Queue
-import org.specs2.mutable.Specification
-import org.specs2.ScalaCheck
 
-class QueueSpec(implicit ec: ExecutionContext)
-    extends Specification
-    with ScalaCheck {
+class QueueSpec extends BaseSpec {
 
-  implicit val Timer: Timer[IO] = IO.timer(ec)
-  implicit val ContextShift: ContextShift[IO] = IO.contextShift(ec)
+  import DefaultEnv._
 
-  "An unbounded Queue" should {
+  "An unbounded Queue" - {
 
     // Using property based testing for this assertion greatly
     // increases the chance of testing all the concurrent
     // interleavings.
-    "block on an empty queue until an element is available" in prop {
+    "should block on an empty queue until an element is available" in forAll {
       (fst: Int, snd: Int) =>
         def concurrentProducerConsumer =
           for {
@@ -33,28 +25,28 @@ class QueueSpec(implicit ec: ExecutionContext)
             result <- consumer.merge(producer)
           } yield result
 
-        concurrentProducerConsumer.compile.toVector.unsafeRunSync must contain(
-          fst,
-          snd)
+      val res = concurrentProducerConsumer.compile.toVector.unsafeRunSync
+
+      assert(res.contains(fst) && res.contains(snd))
     }
 
-    "dequeue the highest priority elements first" in prop {
+    "should dequeue the highest priority elements first" in forAll {
       (elems: Vector[Int]) =>
         def input = elems.zipWithIndex
-
-        prog(input).unsafeRunSync must beEqualTo(elems.reverse)
+       
+        assert(prog(input).unsafeRunSync === elems.reverse)
     }
 
-    "dequeue elements with the same priority in FIFO order" in prop {
+    "should dequeue elements with the same priority in FIFO order" in forAll {
       (elems: Vector[Int]) =>
         def input = elems.map(_ -> 0)
 
-        prog(input).unsafeRunSync must beEqualTo(elems)
+        assert(prog(input).unsafeRunSync === elems)
     }
   }
 
-  "A bounded Queue" should {
-    "fail an enqueue attempt if the queue is full" in {
+  "A bounded Queue" - {
+    "should fail an enqueue attempt if the queue is full" in {
       def prog =
         for {
           q <- Queue.bounded[IO, Int](1)
@@ -62,10 +54,10 @@ class QueueSpec(implicit ec: ExecutionContext)
           _ <- q.enqueue(1, 0)
         } yield ()
 
-      prog.unsafeRunSync must throwA[LimitReachedException]
+      assertThrows[LimitReachedException](prog.unsafeRunSync)
     }
 
-    "successfully enqueue after dequeueing from a full queue" in {
+    "should successfully enqueue after dequeueing from a full queue" in {
       def prog =
         for {
           q <- Queue.bounded[IO, Int](1)
@@ -76,7 +68,7 @@ class QueueSpec(implicit ec: ExecutionContext)
           r <- q.dequeue
         } yield r
 
-      prog.unsafeRunSync must beEqualTo(3)
+      assert(prog.unsafeRunSync === 3)
     }
   }
 

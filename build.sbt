@@ -54,26 +54,16 @@ lazy val dependencies =
   )
 
 lazy val tests = {
-  // TODO scalatest, cats-effect-laws
-  val dependencies = {
-    val specs2 = dep("org.specs2")("3.8.9")(
-      "specs2-core",
-      "specs2-scalacheck"
-    )
-
-    val mixed = Seq(
-      "org.scalacheck" %% "scalacheck" % "1.13.4",
-      "org.scalactic" %% "scalactic" % "3.0.1"
-    )
-
+  val dependencies =
     libraryDependencies ++= Seq(
-      specs2,
-      mixed
-    ).flatten.map(_ % "test")
-  }
+      "org.scalacheck" %% "scalacheck" % "1.13.4",
+      "org.scalactic" %% "scalactic" % "3.0.5",
+      "org.scalatest" %% "scalatest" % "3.0.5",
+      "org.typelevel" %% "cats-effect-laws" % "1.0.0"
+    ).map(_ % "test")
 
   val frameworks =
-    testFrameworks := Seq(TestFrameworks.Specs2)
+    testFrameworks := Seq(TestFrameworks.ScalaTest)
 
   Seq(dependencies, frameworks)
 }
