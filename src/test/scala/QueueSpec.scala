@@ -10,12 +10,12 @@ class QueueSpec extends BaseSpec {
 
   import DefaultEnv._
 
-  "An unbounded Queue" - {
+  "An unbounded Queue should" - {
 
     // Using property based testing for this assertion greatly
     // increases the chance of testing all the concurrent
     // interleavings.
-    "should block on an empty queue until an element is available" in forAll {
+    "block on an empty queue until an element is available" in forAll {
       (fst: Int, snd: Int) =>
         def concurrentProducerConsumer =
           for {
@@ -30,14 +30,14 @@ class QueueSpec extends BaseSpec {
       assert(res.contains(fst) && res.contains(snd))
     }
 
-    "should dequeue the highest priority elements first" in forAll {
+    "dequeue the highest priority elements first" in forAll {
       (elems: Vector[Int]) =>
         def input = elems.zipWithIndex
        
         assert(prog(input).unsafeRunSync === elems.reverse)
     }
 
-    "should dequeue elements with the same priority in FIFO order" in forAll {
+    "dequeue elements with the same priority in FIFO order" in forAll {
       (elems: Vector[Int]) =>
         def input = elems.map(_ -> 0)
 
@@ -45,8 +45,8 @@ class QueueSpec extends BaseSpec {
     }
   }
 
-  "A bounded Queue" - {
-    "should fail an enqueue attempt if the queue is full" in {
+  "A bounded Queue should" - {
+    "fail an enqueue attempt if the queue is full" in {
       def prog =
         for {
           q <- Queue.bounded[IO, Int](1)
@@ -57,7 +57,7 @@ class QueueSpec extends BaseSpec {
       assertThrows[LimitReachedException](prog.unsafeRunSync)
     }
 
-    "should successfully enqueue after dequeueing from a full queue" in {
+    "successfully enqueue after dequeueing from a full queue" in {
       def prog =
         for {
           q <- Queue.bounded[IO, Int](1)

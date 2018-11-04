@@ -27,8 +27,8 @@ class BackPressureSpec extends BaseSpec {
     samplingWindow = samplingWindow
   )
 
-  "Backpressure" - {
-    "should follow the provided backOff function" in {
+  "Backpressure should" - {
+    "follow the provided backOff function" in {
       val E = new Env
       import E._
 
@@ -51,7 +51,7 @@ class BackPressureSpec extends BaseSpec {
       }
     }
 
-    "should only apply when jobs are signalling for it" in {
+    "only apply when jobs are signalling for it" in {
       val E = new Env
       import E._
 

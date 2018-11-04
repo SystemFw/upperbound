@@ -11,9 +11,9 @@ class SubmissionSemanticsSpec extends BaseSpec {
 
   "A worker" - {
 
-    "when using fire-and-forget semantics" - {
+    "when using fire-and-forget semantics should" - {
 
-      "should continue execution immediately" in {
+      "continue execution immediately" in {
         def prog =
           for {
             complete <- Ref.of[IO, Boolean](false)
@@ -29,9 +29,9 @@ class SubmissionSemanticsSpec extends BaseSpec {
       }
     }
 
-    "when using await semantics" - {
+    "when using await semantics should" - {
 
-      "should complete when the result of the submitted job is ready" in {
+      "complete when the result of the submitted job is ready" in {
         def prog =
           for {
             complete <- Ref.of[IO, Boolean](false)
@@ -47,7 +47,7 @@ class SubmissionSemanticsSpec extends BaseSpec {
         assert(state === true)
       }
     
-    "should report the original error if execution of the submitted job fails" in {
+    "report the original error if execution of the submitted job fails" in {
       case class MyError() extends Exception
       def prog =
         for {
@@ -60,8 +60,8 @@ class SubmissionSemanticsSpec extends BaseSpec {
     }
     }
 
-    "when too many jobs have been submitted" - {
-      "should reject new jobs immediately" in {
+    "when too many jobs have been submitted should" - {
+      "reject new jobs immediately" in {
         def prog =
           for {
             limiter <- Limiter.start[IO](1 every 10.seconds, n = 0)
