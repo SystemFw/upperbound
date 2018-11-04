@@ -2,15 +2,14 @@ package upperbound
 
 import cats._, implicits._
 import cats.effect._, concurrent._
+import cats.effect.implicits._
 import fs2._
 import cats.collections.Heap
 
 object queues {
 
   /**
-    * A purely functional, concurrent, mutable priority queue.
-    * Operations are all nonblocking in their implementations, but may
-    * be 'semantically' blocking
+    * Non-blocking, concurrent, MPSC priority queue.
     */
   trait Queue[F[_], A] {
 
@@ -46,18 +45,14 @@ object queues {
       * `dequeue` immediately fails if the queue is empty
       */
     def naive[F[_], A](implicit F: Concurrent[F]): F[Queue[F, A]] =
-      Ref.of[F, IQueue[A]](IQueue.empty[A]) map { qref =>
+      Ref[F].of(IQueue.empty[A]).map { qref =>
         new Queue[F, A] {
           def enqueue(a: A, priority: Int): F[Unit] =
-            qref.modify { q =>
-              q.enqueue(a, priority) -> q
-            }.void
+            qref.update { _.enqueue(a, priority) }
 
           def dequeue: F[A] =
             qref.modify { q =>
-              q.dequeued -> q.dequeue
-                .map(_.pure[F])
-                .getOrElse(F.raiseError(new NoSuchElementException))
+              q.dequeued -> F.delay(q.dequeue.get)
             }.flatten
 
           def size: F[Int] =
@@ -70,16 +65,20 @@ object queues {
       * `dequeue` blocks on empty queue until an element is available.
       */
     def unbounded[F[_], A](implicit F: Concurrent[F]): F[Queue[F, A]] =
-      Semaphore(0) flatMap { n =>
-        naive[F, A] map { queue =>
+      Semaphore(0).flatMap { n =>
+        naive[F, A].map { q =>
           new Queue[F, A] {
             def enqueue(a: A, priority: Int): F[Unit] =
-              queue.enqueue(a, priority) *> n.release
+              q.enqueue(a, priority).guarantee(n.release)
 
+            // This isn't safe wrt interruption in general, but we can
+            // get away with it because there is a single consumer, which
+            // only interrupts a dequeue when it is interrupted itself.
+            // TODO rewrite this with Ref + Deferred in any case
             def dequeue: F[A] =
-              n.acquire *> queue.dequeue
+              n.acquire *> q.dequeue
 
-            def size = queue.size
+            def size = q.size
           }
         }
       }
@@ -91,8 +90,8 @@ object queues {
       */
     def bounded[F[_], A](maxSize: Int)(
         implicit F: Concurrent[F]): F[Queue[F, A]] =
-      Semaphore(maxSize.toLong) flatMap { permits =>
-        Queue.unbounded[F, A] map { queue =>
+      Semaphore(maxSize.toLong).flatMap { permits =>
+        Queue.unbounded[F, A].map { queue =>
           new Queue[F, A] {
             def enqueue(a: A, priority: Int): F[Unit] =
               permits.tryAcquire ifM (
