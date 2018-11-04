@@ -39,9 +39,10 @@ object core {
       * processing rate: it won't do any error handling for you. Also
       * see [[BackPressure]]
       */
-    def submit[A](job: F[A],
-                  priority: Int = 0,
-                  ack: BackPressure.Ack[A] = BackPressure.never[A]): F[Unit]
+    def submit[A](
+        job: F[A],
+        priority: Int = 0,
+        ack: BackPressure.Ack[A] = BackPressure.never[A]): F[Unit]
 
     /**
       * Returns an `F[A]` which represents the action of submitting
@@ -66,9 +67,10 @@ object core {
       * processing rate: it won't do any error handling for you. Also
       * see [[BackPressure]]
       */
-    def await[A](job: F[A],
-                 priority: Int = 0,
-                 ack: BackPressure.Ack[A] = BackPressure.never[A]): F[A]
+    def await[A](
+        job: F[A],
+        priority: Int = 0,
+        ack: BackPressure.Ack[A] = BackPressure.never[A]): F[A]
 
     /**
       * Obtains a snapshot of the current number of jobs waiting to be
@@ -83,9 +85,10 @@ object core {
     def create[F[_]](backend: Queue[F, F[BackPressure]])(
         implicit F: Concurrent[F]): Worker[F] = new Worker[F] {
 
-      def submit[A](job: F[A],
-                    priority: Int,
-                    ack: BackPressure.Ack[A]): F[Unit] =
+      def submit[A](
+          job: F[A],
+          priority: Int,
+          ack: BackPressure.Ack[A]): F[Unit] =
         backend.enqueue(
           job.attempt map ack,
           priority
@@ -108,13 +111,15 @@ object core {
       */
     def noOp[F[_]: Applicative]: Worker[F] =
       new Worker[F] {
-        def submit[A](job: F[A],
-                      priority: Int,
-                      ack: BackPressure.Ack[A]): F[Unit] = job.void
+        def submit[A](
+            job: F[A],
+            priority: Int,
+            ack: BackPressure.Ack[A]): F[Unit] = job.void
 
-        def await[A](job: F[A],
-                     priority: Int = 0,
-                     ack: BackPressure.Ack[A]): F[A] = job
+        def await[A](
+            job: F[A],
+            priority: Int = 0,
+            ack: BackPressure.Ack[A]): F[A] = job
 
         def pending: F[Int] = 0.pure[F]
       }
@@ -158,8 +163,9 @@ object core {
     def start[F[_]](
         period: FiniteDuration,
         backOff: FiniteDuration => FiniteDuration,
-        n: Int)(implicit Timer: Timer[F],
-                Concurrent: Concurrent[F]): F[Limiter[F]] =
+        n: Int)(
+        implicit Timer: Timer[F],
+        Concurrent: Concurrent[F]): F[Limiter[F]] =
       Queue.bounded[F, F[BackPressure]](n) flatMap { queue =>
         SignallingRef[F, Boolean](false) flatMap { stop =>
           Ref.of[F, FiniteDuration](period) flatMap { interval =>

@@ -25,15 +25,15 @@ class QueueSpec extends BaseSpec {
             result <- consumer.merge(producer)
           } yield result
 
-      val res = concurrentProducerConsumer.compile.toVector.unsafeRunSync
+        val res = concurrentProducerConsumer.compile.toVector.unsafeRunSync
 
-      assert(res.contains(fst) && res.contains(snd))
+        assert(res.contains(fst) && res.contains(snd))
     }
 
     "dequeue the highest priority elements first" in forAll {
       (elems: Vector[Int]) =>
         def input = elems.zipWithIndex
-       
+
         assert(prog(input).unsafeRunSync === elems.reverse)
     }
 

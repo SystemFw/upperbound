@@ -13,7 +13,8 @@ lazy val commonSettings = Seq(
   organization := "org.systemfw",
   name := "upperbound",
   scalaVersion := "2.12.6",
-  crossScalaVersions := Seq("2.11.12", scalaVersion.value)
+  crossScalaVersions := Seq("2.11.12", scalaVersion.value),
+  scalafmtOnCompile := true
 )
 
 lazy val consoleSettings = Seq(
@@ -57,7 +58,6 @@ lazy val tests = {
   val dependencies =
     libraryDependencies ++= Seq(
       "org.scalacheck" %% "scalacheck" % "1.13.4",
-      "org.scalactic" %% "scalactic" % "3.0.5",
       "org.scalatest" %% "scalatest" % "3.0.5",
       "org.typelevel" %% "cats-effect-laws" % "1.0.0"
     ).map(_ % "test")

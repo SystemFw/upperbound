@@ -1,7 +1,7 @@
 package upperbound
 
 import cats._, implicits._
-import cats.effect._,  concurrent._
+import cats.effect._, concurrent._
 import fs2._
 import cats.collections.Heap
 
@@ -55,7 +55,9 @@ object queues {
 
           def dequeue: F[A] =
             qref.modify { q =>
-              q.dequeued -> q.dequeue.map(_.pure[F]).getOrElse(F.raiseError(new NoSuchElementException))
+              q.dequeued -> q.dequeue
+                .map(_.pure[F])
+                .getOrElse(F.raiseError(new NoSuchElementException))
             }.flatten
 
           def size: F[Int] =
@@ -87,7 +89,8 @@ object queues {
       * `dequeue` blocks on empty queue until an element is available.
       * `enqueue` immediately fails if the queue is full.
       */
-    def bounded[F[_], A](maxSize: Int)(implicit F: Concurrent[F]): F[Queue[F, A]] =
+    def bounded[F[_], A](maxSize: Int)(
+        implicit F: Concurrent[F]): F[Queue[F, A]] =
       Semaphore(maxSize.toLong) flatMap { permits =>
         Queue.unbounded[F, A] map { queue =>
           new Queue[F, A] {

@@ -43,9 +43,10 @@ class BackPressureSpec extends BaseSpec {
       val res = mkScenario[IO](conditions).unsafeToFuture
       env.tick(samplingWindow)
 
-      res.map { r  =>
+      res.map { r =>
         val measuredBackOff = r.jobExecutionMetrics.diffs.map(_ / T)
-        val linear = Stream.iterate(1)(_ + 1).take(measuredBackOff.length).toVector
+        val linear =
+          Stream.iterate(1)(_ + 1).take(measuredBackOff.length).toVector
 
         assert(measuredBackOff === linear)
       }
@@ -54,7 +55,6 @@ class BackPressureSpec extends BaseSpec {
     "only apply when jobs are signalling for it" in {
       val E = new Env
       import E._
-
 
       def constantBackOff: FiniteDuration => FiniteDuration = _ => T.millis * 2
       def everyOtherJob: BackPressure.Ack[Int] =
@@ -70,7 +70,8 @@ class BackPressureSpec extends BaseSpec {
 
       res.map { r =>
         val measuredBackOff = r.jobExecutionMetrics.diffs.map(_ / T)
-        val alternating = Stream(1, 2).repeat.take(measuredBackOff.length).toVector
+        val alternating =
+          Stream(1, 2).repeat.take(measuredBackOff.length).toVector
 
         assert(measuredBackOff === alternating)
       }

@@ -5,8 +5,6 @@ import scala.concurrent.duration._
 
 import syntax.rate._
 
-import org.scalactic.Tolerance
-
 class RateLimitingSpec extends BaseSpec {
   val samplingWindow = 10.seconds
   import TestScenarios._
@@ -31,7 +29,7 @@ class RateLimitingSpec extends BaseSpec {
       env.tick(samplingWindow)
 
       res.map { r =>
-        assert(r.jobExecutionMetrics.diffs.forall(_  === 200L))
+        assert(r.jobExecutionMetrics.diffs.forall(_ === 200L))
       }
     }
 
@@ -49,8 +47,6 @@ class RateLimitingSpec extends BaseSpec {
         jobCompletion = 0.seconds,
         samplingWindow = samplingWindow
       )
-
-      import Tolerance._
 
       val res = mkScenario[IO](conditions).unsafeToFuture
       env.tick(samplingWindow)

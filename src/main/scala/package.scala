@@ -48,9 +48,11 @@ package object upperbound {
       * Produces a singleton Stream, emitting a new Limiter with the same semantics as [[core.Limiter.start]].
       * The instance is bracketed to clean up after use so calling `.shutdown` is no required.
       */
-    def stream[F[_]: Concurrent: Timer](maxRate: Rate,
-                     backOff: FiniteDuration => FiniteDuration = identity,
-                     n: Int = Int.MaxValue): Stream[F, Limiter[F]] = Stream.bracket(Limiter.start(maxRate, backOff, n))(_.shutDown)
+    def stream[F[_]: Concurrent: Timer](
+        maxRate: Rate,
+        backOff: FiniteDuration => FiniteDuration = identity,
+        n: Int = Int.MaxValue): Stream[F, Limiter[F]] =
+      Stream.bracket(Limiter.start(maxRate, backOff, n))(_.shutDown)
   }
 
   /**

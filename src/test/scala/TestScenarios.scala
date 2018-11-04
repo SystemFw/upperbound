@@ -21,11 +21,12 @@ object TestScenarios {
       samplingWindow: FiniteDuration
   )
 
-  case class Metric(diffs: Vector[Long],
-                    mean: Double,
-                    stdDeviation: Double,
-                    overshoot: Double,
-                    undershoot: Double)
+  case class Metric(
+      diffs: Vector[Long],
+      mean: Double,
+      stdDeviation: Double,
+      overshoot: Double,
+      undershoot: Double)
   object Metric {
     def from(samples: Vector[Long]): Metric = {
       def diffs =
@@ -50,11 +51,11 @@ object TestScenarios {
       jobExecutionMetrics: Metric
   )
 
-  def mkScenario[F[_]: Concurrent](t: TestingConditions)(implicit T: Timer[F]): F[Result] =
+  def mkScenario[F[_]: Concurrent](t: TestingConditions)(
+      implicit T: Timer[F]): F[Result] =
     Ref[F].of(Vector.empty[Long]) flatMap { submissionTimes =>
       Ref[F].of(Vector.empty[Long]) flatMap { startTimes =>
         Limiter.start[F](t.desiredRate, t.backOff) flatMap { limiter =>
-
           def record(destination: Ref[F, Vector[Long]]): F[Unit] =
             T.clock.monotonic(MILLISECONDS) flatMap { time =>
               destination.update(times => time +: times)

@@ -46,18 +46,18 @@ class SubmissionSemanticsSpec extends BaseSpec {
         assert(res === "done")
         assert(state === true)
       }
-    
-    "report the original error if execution of the submitted job fails" in {
-      case class MyError() extends Exception
-      def prog =
-        for {
-          limiter <- Limiter.start[IO](1 every 1.seconds)
-          res <- limiter.worker await IO.raiseError[Int](new MyError)
-          _ <- limiter.shutDown
-        } yield res
 
-      assertThrows[MyError](prog.unsafeRunSync)
-    }
+      "report the original error if execution of the submitted job fails" in {
+        case class MyError() extends Exception
+        def prog =
+          for {
+            limiter <- Limiter.start[IO](1 every 1.seconds)
+            res <- limiter.worker await IO.raiseError[Int](new MyError)
+            _ <- limiter.shutDown
+          } yield res
+
+        assertThrows[MyError](prog.unsafeRunSync)
+      }
     }
 
     "when too many jobs have been submitted should" - {
