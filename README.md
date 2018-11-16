@@ -1,6 +1,7 @@
 # upperbound
 
 [![Build Status](https://travis-ci.org/SystemFw/upperbound.svg?branch=master)](https://travis-ci.org/SystemFw/upperbound)
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/org.systemfw/upperbound_2.12/badge.svg)](https://maven-badges.herokuapp.com/maven-central/org.systemfw/upperbound_2.12)
 
 **upperbound** is a purely functional rate limiter. It
 allows you to submit jobs concurrently, which will then be started at
