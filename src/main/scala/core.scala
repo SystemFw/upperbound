@@ -109,7 +109,7 @@ object core {
     def start[F[_]: Concurrent: Timer](
         period: FiniteDuration,
         backOff: FiniteDuration => FiniteDuration,
-        n: Int): F[Limiter[F]] =
+        n: Int): Resource[F, Limiter[F]] = Resource {
       (
         Queue.bounded[F, F[BackPressure]](n),
         Deferred[F, Unit],
@@ -162,8 +162,10 @@ object core {
             def pending: F[Int] = queue.size
           }
 
-          executor.compile.drain.start.void.as(limiter) // TODO stop
+          executor.compile.drain.start.void
+            .as(limiter -> stop.complete(()))
       }.flatten
+    }
 
     /**
       * Creates a no-op [[Limiter]], with no rate limiting and a synchronous

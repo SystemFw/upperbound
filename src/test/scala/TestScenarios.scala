@@ -51,45 +51,50 @@ object TestScenarios {
       jobExecutionMetrics: Metric
   )
 
-  def mkScenario[F[_]: Concurrent](t: TestingConditions)(
-      implicit T: Timer[F]): F[Result] =
-    Ref[F].of(Vector.empty[Long]) flatMap { submissionTimes =>
-      Ref[F].of(Vector.empty[Long]) flatMap { startTimes =>
-        Limiter.start[F](t.desiredRate, t.backOff) flatMap { limiter =>
-          def record(destination: Ref[F, Vector[Long]]): F[Unit] =
-            T.clock.monotonic(MILLISECONDS) flatMap { time =>
-              destination.update(times => time +: times)
-            }
+  def vector[F[_]: Concurrent] = Ref[F].of(Vector.empty[Long])
 
-          def job(i: Int) =
-            record(startTimes) *> T.sleep(t.jobCompletion).as(i)
+  def mkScenario[F[_]: Concurrent: Timer](t: TestingConditions): F[Result] =
+    (vector[F], vector[F]).mapN {
+      case (submissionTimes, startTimes) =>
+        def record(destination: Ref[F, Vector[Long]]): F[Unit] =
+          Timer[F].clock.monotonic(MILLISECONDS) flatMap { time =>
+            destination.update(times => time +: times)
+          }
 
-          def producer: Stream[F, Unit] =
-            Stream.range(0, t.jobsPerProducer).map(job) evalMap { x =>
-              record(submissionTimes) *> limiter.submit(
-                job = x,
-                priority = 0,
-                ack = t.backPressure)
-            }
+        def job(i: Int) =
+          record(startTimes) >> Timer[F].sleep(t.jobCompletion).as(i)
 
-          def pulse = Stream.fixedRate[F](t.productionRate.period)
+        def pulse = Stream.fixedRate[F](t.productionRate.period)
 
-          def concurrentProducers: Stream[F, Unit] =
+        def concurrentProducers: Sink[F, Unit] =
+          producer =>
             Stream(producer zipLeft pulse).repeat
               .take(t.producers)
               .parJoin(t.producers)
 
-          for {
-            _ <- concurrentProducers.compile.drain.start.void
-            _ <- T.sleep(t.samplingWindow) // *> limiter.shutDown TODO
-            p <- submissionTimes.get
-            j <- startTimes.get
-          } yield
+        def experiment = Limiter.start[F](t.desiredRate, t.backOff).use {
+          limiter =>
+            def producer: Stream[F, Unit] =
+              Stream.range(0, t.jobsPerProducer).map(job) evalMap { x =>
+                record(submissionTimes) *> limiter
+                  .submit(job = x, priority = 0, ack = t.backPressure)
+              }
+
+            Stream
+              .sleep[F](t.samplingWindow)
+              .concurrently(producer.to(concurrentProducers))
+              .compile
+              .drain
+        }
+
+        def collectResults = (submissionTimes.get, startTimes.get).mapN {
+          (prods, jobs) =>
             Result(
-              producerMetrics = Metric.from(p.sorted),
-              jobExecutionMetrics = Metric.from(j.sorted)
+              producerMetrics = Metric.from(prods.sorted),
+              jobExecutionMetrics = Metric.from(jobs.sorted)
             )
         }
-      }
-    }
+
+        experiment >> collectResults
+    }.flatten
 }

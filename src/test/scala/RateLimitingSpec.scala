@@ -52,8 +52,7 @@ class RateLimitingSpec extends BaseSpec {
       env.tick(samplingWindow)
 
       res.map { r =>
-        // TODO why are the first two faster?
-        assert(r.jobExecutionMetrics.diffs.drop(2).forall(_ === 300L))
+        assert(r.jobExecutionMetrics.diffs.forall(_ === 300L))
       }
     }
   }

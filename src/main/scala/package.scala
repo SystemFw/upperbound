@@ -1,5 +1,5 @@
 import cats.Applicative
-import cats.effect.{Concurrent, Timer}
+import cats.effect.{Concurrent, Timer, Resource}
 
 import scala.concurrent.duration._
 import fs2.Stream
@@ -39,7 +39,7 @@ package object upperbound {
     def start[F[_]: Concurrent: Timer](
         maxRate: Rate,
         backOff: FiniteDuration => FiniteDuration = identity,
-        n: Int = Int.MaxValue): F[Limiter[F]] =
+        n: Int = Int.MaxValue): Resource[F, Limiter[F]] =
       core.Limiter.start[F](maxRate.period, backOff, n)
   }
 

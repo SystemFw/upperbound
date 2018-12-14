@@ -48,9 +48,9 @@ def dep(org: String)(version: String)(modules: String*) =
 
 lazy val dependencies =
   libraryDependencies ++= Seq(
-    "co.fs2" %% "fs2-core" % "1.0.0",
+    "co.fs2" %% "fs2-core" % "1.0.2",
     "org.typelevel" %% "cats-core" % "1.4.0",
-    "org.typelevel" %% "cats-effect" % "1.0.0",
+    "org.typelevel" %% "cats-effect" % "1.1.0",
     "org.typelevel" %% "cats-collections-core" % "0.7.0"
   )
 

@@ -17,9 +17,9 @@ class SubmissionSemanticsSpec extends BaseSpec {
         def prog =
           for {
             complete <- Ref.of[IO, Boolean](false)
-            limiter <- Limiter.start[IO](1 every 10.seconds)
-            _ <- limiter submit complete.set(true)
-            //_ <- limiter.shutDown TODO
+            _ <- Limiter.start[IO](1 every 10.seconds).use { limiter =>
+              limiter submit complete.set(true)
+            }
             res <- complete.get
           } yield res
 
@@ -35,9 +35,9 @@ class SubmissionSemanticsSpec extends BaseSpec {
         def prog =
           for {
             complete <- Ref.of[IO, Boolean](false)
-            limiter <- Limiter.start[IO](1 every 1.seconds)
-            res <- limiter await complete.set(true).as("done")
-            //_ <- limiter.shutDown TODO
+            res <- Limiter.start[IO](1 every 1.seconds).use { limiter =>
+              limiter await complete.set(true).as("done")
+            }
             state <- complete.get
           } yield res -> state
 
@@ -49,12 +49,9 @@ class SubmissionSemanticsSpec extends BaseSpec {
 
       "report the original error if execution of the submitted job fails" in {
         case class MyError() extends Exception
-        def prog =
-          for {
-            limiter <- Limiter.start[IO](1 every 1.seconds)
-            res <- limiter await IO.raiseError[Int](new MyError)
-            //_ <- limiter.shutDown TODO
-          } yield res
+        def prog = Limiter.start[IO](1 every 1.seconds).use { limiter =>
+          limiter await IO.raiseError[Int](new MyError)
+        }
 
         assertThrows[MyError](prog.unsafeRunSync)
       }
@@ -62,19 +59,14 @@ class SubmissionSemanticsSpec extends BaseSpec {
 
     "when too many jobs have been submitted should" - {
       "reject new jobs immediately" in {
-        def prog =
-          for {
-            limiter <- Limiter.start[IO](1 every 10.seconds, n = 0)
-            res <- limiter await IO.unit
-            //_ <- limiter.shutDown TODO
-          } yield res
+        def prog = Limiter.start[IO](1 every 10.seconds, n = 0).use { limiter =>
+          limiter await IO.unit
+        }
 
-        def prog2 =
-          for {
-            limiter <- Limiter.start[IO](1 every 10.seconds, n = 0)
-            _ <- limiter submit IO.unit
-            // _ <- limiter.shutDown TODO
-          } yield ()
+        def prog2 = Limiter.start[IO](1 every 10.seconds, n = 0).use {
+          limiter =>
+            limiter submit IO.unit
+        }
 
         assertThrows[LimitReachedException](prog.unsafeRunSync)
         assertThrows[LimitReachedException](prog2.unsafeRunSync)
