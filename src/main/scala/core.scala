@@ -17,7 +17,7 @@ object core {
 
     /**
       * Returns an `F[Unit]` which represents the action of submitting
-      * `job` to the [[Limiter]], with the given priority. A higher
+      * `job` to the limiter with the given priority. A higher
       * number means a higher priority. The default is 0.
       *
       * The semantics of `submit` are fire-and-forget: the returned
@@ -82,9 +82,9 @@ object core {
   object Limiter {
 
     /**
-      * Creates a new [[Limiter]], and concurrently starts processing the
-      * jobs submitted by the corresponding [[Worker]], which are
-      * started at a rate no higher than `1 / period`
+      * Creates a new [[Limiter]] and starts processing the jobs
+      * submitted by the it, which are started at a rate no higher
+      * than `1 / period`
       *
       * Every time a job signals backpressure is needed, the [[Limiter]]
       * will adjust its current rate by applying `backOff` to it. This
@@ -93,18 +93,18 @@ object core {
       * backpressure, and reset to its original value when a job
       * signals backpressure is no longer needed.
       *
-      * Note that since jobs submitted to the limiter are processed
+      * Note that since jobs submitted to the [[Limiter]] are processed
       * asynchronously, rate changes might not propagate instantly when
       * the rate is smaller than the job completion time. However, the
       * rate will eventually converge to its most up-to-date value.
       *
-      * Similarly, `n` allows you to place a bound on the maximum
+      * Additionally, `n` allows you to place a bound on the maximum
       * number of jobs allowed to queue up while waiting for
       * execution. Once this number is reached, the `F` returned by
-      * any call to the corresponding [[Worker]] will immediately fail
-      * with a [[LimitReachedException]], so that you can in turn
-      * signal for backpressure downstream. Processing restarts as
-      * soon as the number of jobs waiting goes below `n` again.
+      * any call to the [[Limiter]] will immediately fail with a
+      * [[LimitReachedException]], so that you can in turn signal for
+      * backpressure downstream. Processing restarts as soon as the
+      * number of jobs waiting goes below `n` again.
       */
     def start[F[_]: Concurrent: Timer](
         period: FiniteDuration,
@@ -166,7 +166,7 @@ object core {
       }.flatten
 
     /**
-      * Creates a noOp worker, with no rate limiting and a synchronous
+      * Creates a no-op [[Limiter]], with no rate limiting and a synchronous
       * `submit` method. `pending` is always zero.
       */
     def noOp[F[_]: Applicative]: Limiter[F] =
