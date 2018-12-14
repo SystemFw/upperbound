@@ -66,7 +66,7 @@ object TestScenarios {
 
           def producer: Stream[F, Unit] =
             Stream.range(0, t.jobsPerProducer).map(job) evalMap { x =>
-              record(submissionTimes) *> limiter.worker.submit(
+              record(submissionTimes) *> limiter.submit(
                 job = x,
                 priority = 0,
                 ack = t.backPressure)
@@ -81,7 +81,7 @@ object TestScenarios {
 
           for {
             _ <- concurrentProducers.compile.drain.start.void
-            _ <- T.sleep(t.samplingWindow) *> limiter.shutDown
+            _ <- T.sleep(t.samplingWindow) // *> limiter.shutDown TODO
             p <- submissionTimes.get
             j <- startTimes.get
           } yield

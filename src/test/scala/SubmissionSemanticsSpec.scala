@@ -18,8 +18,8 @@ class SubmissionSemanticsSpec extends BaseSpec {
           for {
             complete <- Ref.of[IO, Boolean](false)
             limiter <- Limiter.start[IO](1 every 10.seconds)
-            _ <- limiter.worker submit complete.set(true)
-            _ <- limiter.shutDown
+            _ <- limiter submit complete.set(true)
+            //_ <- limiter.shutDown TODO
             res <- complete.get
           } yield res
 
@@ -36,8 +36,8 @@ class SubmissionSemanticsSpec extends BaseSpec {
           for {
             complete <- Ref.of[IO, Boolean](false)
             limiter <- Limiter.start[IO](1 every 1.seconds)
-            res <- limiter.worker await complete.set(true).as("done")
-            _ <- limiter.shutDown
+            res <- limiter await complete.set(true).as("done")
+            //_ <- limiter.shutDown TODO
             state <- complete.get
           } yield res -> state
 
@@ -52,8 +52,8 @@ class SubmissionSemanticsSpec extends BaseSpec {
         def prog =
           for {
             limiter <- Limiter.start[IO](1 every 1.seconds)
-            res <- limiter.worker await IO.raiseError[Int](new MyError)
-            _ <- limiter.shutDown
+            res <- limiter await IO.raiseError[Int](new MyError)
+            //_ <- limiter.shutDown TODO
           } yield res
 
         assertThrows[MyError](prog.unsafeRunSync)
@@ -65,15 +65,15 @@ class SubmissionSemanticsSpec extends BaseSpec {
         def prog =
           for {
             limiter <- Limiter.start[IO](1 every 10.seconds, n = 0)
-            res <- limiter.worker await IO.unit
-            _ <- limiter.shutDown
+            res <- limiter await IO.unit
+            //_ <- limiter.shutDown TODO
           } yield res
 
         def prog2 =
           for {
             limiter <- Limiter.start[IO](1 every 10.seconds, n = 0)
-            _ <- limiter.worker submit IO.unit
-            _ <- limiter.shutDown
+            _ <- limiter submit IO.unit
+            // _ <- limiter.shutDown TODO
           } yield ()
 
         assertThrows[LimitReachedException](prog.unsafeRunSync)

@@ -11,10 +11,9 @@ import queues.Queue
 object core {
 
   /**
-    * A purely functional worker which submits jobs to the rate
-    * limiter for asynchronous execution
+    * A purely functional, interval based rate limiter.
     */
-  trait Worker[F[_]] {
+  trait Limiter[F[_]] {
 
     /**
       * Returns an `F[Unit]` which represents the action of submitting
@@ -80,59 +79,6 @@ object core {
     def pending: F[Int]
   }
 
-  object Worker {
-
-    def create[F[_]](backend: Queue[F, F[BackPressure]])(
-        implicit F: Concurrent[F]): Worker[F] = new Worker[F] {
-
-      def submit[A](
-          job: F[A],
-          priority: Int,
-          ack: BackPressure.Ack[A]): F[Unit] =
-        backend.enqueue(
-          job.attempt map ack,
-          priority
-        )
-
-      def await[A](job: F[A], priority: Int, ack: BackPressure.Ack[A]): F[A] =
-        Deferred[F, Either[Throwable, A]] flatMap { p =>
-          backend.enqueue(
-            job.attempt.flatTap(p.complete).map(ack),
-            priority
-          ) *> p.get.rethrow
-        }
-
-      def pending: F[Int] = backend.size
-    }
-
-    /**
-      * Creates a noOp worker, with no rate limiting and a synchronous
-      * `submit` method. `pending` is always zero.
-      */
-    def noOp[F[_]: Applicative]: Worker[F] =
-      new Worker[F] {
-        def submit[A](
-            job: F[A],
-            priority: Int,
-            ack: BackPressure.Ack[A]): F[Unit] = job.void
-
-        def await[A](
-            job: F[A],
-            priority: Int = 0,
-            ack: BackPressure.Ack[A]): F[A] = job
-
-        def pending: F[Int] = 0.pure[F]
-      }
-  }
-
-  /**
-    * A purely functional rate limiter. Used to manage the lifetime of a [[Worker]]
-    */
-  trait Limiter[F[_]] {
-    def worker: Worker[F]
-    def shutDown: F[Unit]
-  }
-
   object Limiter {
 
     /**
@@ -192,13 +138,51 @@ object core {
               .evalMap(exec)
               .interruptWhen(stop.get.attempt)
 
-          executor.compile.drain.start.void as {
-            new Limiter[F] {
-              def worker = Worker.create(queue)
-              def shutDown = stop.complete(())
-            }
+          def limiter = new Limiter[F] {
+            def submit[A](
+                job: F[A],
+                priority: Int,
+                ack: BackPressure.Ack[A]): F[Unit] =
+              queue.enqueue(
+                job.attempt map ack,
+                priority
+              )
+
+            def await[A](
+                job: F[A],
+                priority: Int,
+                ack: BackPressure.Ack[A]): F[A] =
+              Deferred[F, Either[Throwable, A]] flatMap { p =>
+                queue.enqueue(
+                  job.attempt.flatTap(p.complete).map(ack),
+                  priority
+                ) *> p.get.rethrow
+              }
+
+            def pending: F[Int] = queue.size
           }
 
+          executor.compile.drain.start.void.as(limiter) // TODO stop
       }.flatten
+
+    /**
+      * Creates a noOp worker, with no rate limiting and a synchronous
+      * `submit` method. `pending` is always zero.
+      */
+    def noOp[F[_]: Applicative]: Limiter[F] =
+      new Limiter[F] {
+        def submit[A](
+            job: F[A],
+            priority: Int,
+            ack: BackPressure.Ack[A]): F[Unit] = job.void
+
+        def await[A](
+            job: F[A],
+            priority: Int = 0,
+            ack: BackPressure.Ack[A]): F[A] = job
+
+        def pending: F[Int] = 0.pure[F]
+      }
+
   }
 }
