@@ -160,50 +160,45 @@ object core {
       * signal for backpressure downstream. Processing restarts as
       * soon as the number of jobs waiting goes below `n` again.
       */
-    def start[F[_]](
+    def start[F[_]: Concurrent: Timer](
         period: FiniteDuration,
         backOff: FiniteDuration => FiniteDuration,
-        n: Int)(
-        implicit Timer: Timer[F],
-        Concurrent: Concurrent[F]): F[Limiter[F]] =
-      Queue.bounded[F, F[BackPressure]](n) flatMap { queue =>
-        SignallingRef[F, Boolean](false) flatMap { stop =>
-          Ref.of[F, FiniteDuration](period) flatMap { interval =>
-            // `job` needs to be executed asynchronously so that long
-            // running jobs don't interfere with the frequency of pulling
-            // from the queue. It also means that a failed `job` doesn't
-            // cause the overall processing to fail
-            def exec(job: F[BackPressure]): F[Unit] =
-              Concurrent.start {
-                job.map(_.slowDown) ifM (
-                  ifTrue = interval.modify(i => backOff(i) -> i).void,
-                  ifFalse = interval.set(period)
-                )
-              }.void
+        n: Int): F[Limiter[F]] =
+      (
+        Queue.bounded[F, F[BackPressure]](n),
+        Deferred[F, Unit],
+        Ref.of[F, FiniteDuration](period) // TODO back to SignallingRef, expose it
+      ).mapN {
+        case (queue, stop, interval) =>
+          // `job` needs to be executed asynchronously so that long
+          // running jobs don't interfere with the frequency of pulling
+          // from the queue. It also means that a failed `job` doesn't
+          // cause the overall processing to fail
+          def exec(job: F[BackPressure]): F[Unit] = {
+            job.map(_.slowDown) ifM (
+              ifTrue = interval.modify(i => backOff(i) -> i).void,
+              ifFalse = interval.set(period)
+            )
+          }.start.void // TODO interruption?
 
-            def rate[A]: Pipe[F, A, A] =
-              in =>
-                Stream
-                  .eval(interval.get)
-                  .evalMap(Timer.sleep)
-                  .repeat
-                  .zip(in)
-                  .map(_._2)
+          def rate: Stream[F, Unit] =
+            Stream
+              .repeatEval(interval.get)
+              .flatMap(Stream.sleep[F])
 
-            def executor: Stream[F, Unit] =
-              queue.dequeueAll
-                .through(rate)
-                .evalMap(exec)
-                .interruptWhen(stop)
+          def executor: Stream[F, Unit] =
+            queue.dequeueAll
+              .zipLeft(rate)
+              .evalMap(exec)
+              .interruptWhen(stop.get.attempt)
 
-            executor.compile.drain.start.void as {
-              new Limiter[F] {
-                def worker = Worker.create(queue)
-                def shutDown = stop.set(true)
-              }
+          executor.compile.drain.start.void as {
+            new Limiter[F] {
+              def worker = Worker.create(queue)
+              def shutDown = stop.complete(())
             }
           }
-        }
-      }
+
+      }.flatten
   }
 }

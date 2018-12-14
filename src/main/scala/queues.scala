@@ -74,7 +74,7 @@ object queues {
             // This isn't safe wrt interruption in general, but we can
             // get away with it because there is a single consumer, which
             // only interrupts a dequeue when it is interrupted itself.
-            // TODO rewrite this with Ref + Deferred in any case
+            // TODO rewrite this with Ref + Deferred in any case, or ideally PubSub
             def dequeue: F[A] =
               n.acquire *> q.dequeue
 
