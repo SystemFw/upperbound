@@ -77,6 +77,16 @@ object core {
       * retrieved.
       */
     def pending: F[Int]
+
+    /**
+      * Allows to sample, change or react to changes to the current interval between two tasks.
+      */
+    def interval: SignallingRef[F, FiniteDuration]
+
+    /**
+      * Resets the interval to the one set on creation of this [[Limiter]]
+      */
+    def reset: F[Unit]
   }
 
   object Limiter {
@@ -113,31 +123,9 @@ object core {
       (
         Queue.bounded[F, F[BackPressure]](n),
         Deferred[F, Unit],
-        Ref.of[F, FiniteDuration](period) // TODO back to SignallingRef, expose it
+        SignallingRef[F, FiniteDuration](period)
       ).mapN {
-        case (queue, stop, interval) =>
-          // `job` needs to be executed asynchronously so that long
-          // running jobs don't interfere with the frequency of pulling
-          // from the queue. It also means that a failed `job` doesn't
-          // cause the overall processing to fail
-          def exec(job: F[BackPressure]): F[Unit] = {
-            job.map(_.slowDown) ifM (
-              ifTrue = interval.modify(i => backOff(i) -> i).void,
-              ifFalse = interval.set(period)
-            )
-          }.start.void // TODO interruption?
-
-          def rate: Stream[F, Unit] =
-            Stream
-              .repeatEval(interval.get)
-              .flatMap(Stream.sleep[F])
-
-          def executor: Stream[F, Unit] =
-            queue.dequeueAll
-              .zipLeft(rate)
-              .evalMap(exec)
-              .interruptWhen(stop.get.attempt)
-
+        case (queue, stop, interval_) =>
           def limiter = new Limiter[F] {
             def submit[A](
                 job: F[A],
@@ -160,7 +148,35 @@ object core {
               }
 
             def pending: F[Int] = queue.size
+
+            def interval: SignallingRef[F, FiniteDuration] = interval_
+
+            def reset: F[Unit] = interval.set(period)
           }
+
+          def backPressure(limiter: Limiter[F]): F[BackPressure] => F[Unit] =
+            _.map(_.slowDown) ifM (
+              ifTrue = limiter.interval.modify(i => backOff(i) -> i).void,
+              ifFalse = limiter.interval.set(period)
+            )
+
+          // `job` needs to be executed asynchronously so that long
+          // running jobs don't interfere with the frequency of pulling
+          // from the queue. It also means that a failed `job` doesn't
+          // cause the overall processing to fail
+          def exec(job: F[BackPressure]): F[Unit] =
+            backPressure(limiter).apply(job).start.void
+
+          def rate: Stream[F, Unit] =
+            Stream
+              .repeatEval(limiter.interval.get)
+              .flatMap(Stream.sleep[F])
+
+          def executor: Stream[F, Unit] =
+            queue.dequeueAll
+              .zipLeft(rate)
+              .evalMap(exec)
+              .interruptWhen(stop.get.attempt)
 
           executor.compile.drain.start.void
             .as(limiter -> stop.complete(()))
@@ -170,20 +186,27 @@ object core {
     /**
       * Creates a no-op [[Limiter]], with no rate limiting and a synchronous
       * `submit` method. `pending` is always zero.
+      * `rate` is set to zero and changes to it have no effect.
       */
-    def noOp[F[_]: Applicative]: Limiter[F] =
-      new Limiter[F] {
-        def submit[A](
-            job: F[A],
-            priority: Int,
-            ack: BackPressure.Ack[A]): F[Unit] = job.void
+    def noOp[F[_]: Concurrent]: F[Limiter[F]] =
+      SignallingRef[F, FiniteDuration](0.seconds).map { interval_ =>
+        new Limiter[F] {
+          def submit[A](
+              job: F[A],
+              priority: Int,
+              ack: BackPressure.Ack[A]): F[Unit] = job.void
 
-        def await[A](
-            job: F[A],
-            priority: Int = 0,
-            ack: BackPressure.Ack[A]): F[A] = job
+          def await[A](
+              job: F[A],
+              priority: Int = 0,
+              ack: BackPressure.Ack[A]): F[A] = job
 
-        def pending: F[Int] = 0.pure[F]
+          def pending: F[Int] = 0.pure[F]
+
+          def interval: SignallingRef[F, FiniteDuration] = interval_
+
+          def reset: F[Unit] = interval.set(0.seconds)
+        }
       }
 
   }

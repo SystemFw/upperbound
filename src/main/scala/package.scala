@@ -46,6 +46,6 @@ package object upperbound {
   /**
     * See [[core.Worker.noOp]]
     */
-  def testLimiter[F[_]: Applicative]: Limiter[F] =
+  def testLimiter[F[_]: Concurrent]: F[Limiter[F]] =
     core.Limiter.noOp
 }
