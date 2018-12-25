@@ -17,7 +17,7 @@ object TestScenarios {
       producers: Int,
       jobsPerProducer: Int,
       jobCompletion: FiniteDuration,
-      backPressure: BackPressure.Ack[Int],
+      slowDown: Either[Throwable, Int] => Boolean,
       samplingWindow: FiniteDuration
   )
 
@@ -72,12 +72,17 @@ object TestScenarios {
               .take(t.producers)
               .parJoin(t.producers)
 
-        def experiment = Limiter.start[F](t.desiredRate, t.backOff).use {
-          limiter =>
+        def backOff(fa: F[Int])(implicit L: Limiter[F]) =
+          backpressure.withBackoff(t.backOff, t.slowDown, fa)
+
+        def experiment = Limiter.start[F](t.desiredRate).use {
+          implicit limiter =>
             def producer: Stream[F, Unit] =
-              Stream.range(0, t.jobsPerProducer).map(job) evalMap { x =>
+              Stream
+                .range(0, t.jobsPerProducer)
+                .map(i => backOff(job(i))) evalMap { x =>
                 record(submissionTimes) *> limiter
-                  .submit(job = x, priority = 0, ack = t.backPressure)
+                  .submit(job = x, priority = 0)
               }
 
             Stream

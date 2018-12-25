@@ -27,8 +27,8 @@ package object upperbound {
   type LimitReachedException = model.LimitReachedException
   val LimitReachedException = model.LimitReachedException
 
-  type BackPressure = model.BackPressure
-  val BackPressure = model.BackPressure
+  // type BackPressure = model.BackPressure
+  // val BackPressure = model.BackPressure
 
   type Limiter[F[_]] = core.Limiter[F]
   object Limiter {
@@ -36,22 +36,21 @@ package object upperbound {
 
     def await[F[_]: Concurrent: Limiter, A](
         job: F[A],
-        priority: Int = 0,
-        ack: BackPressure.Ack[A] = BackPressure.never[A]): F[A] =
-      core.Limiter.await(job, priority, ack)
+        priority: Int = 0
+    ): F[A] =
+      core.Limiter.await(job, priority)
 
     /**
       * See [[core.Limiter.start]]
       */
     def start[F[_]: Concurrent: Timer](
         maxRate: Rate,
-        backOff: FiniteDuration => FiniteDuration = identity,
         n: Int = Int.MaxValue): Resource[F, Limiter[F]] =
-      core.Limiter.start[F](maxRate.period, backOff, n)
-  }
+      core.Limiter.start[F](maxRate.period, n)
 
-  /** Summoner */
-  def apply[F[_]](implicit l: Limiter[F]): Limiter[F] = l
+    /** Summoner */
+    def apply[F[_]](implicit l: Limiter[F]): Limiter[F] = l
+  }
 
   /**
     * See [[core.Worker.noOp]]

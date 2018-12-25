@@ -32,16 +32,9 @@ object core {
       * constructing a [[Limiter]]. Higher priority jobs take precedence
       * over lower priority ones.
       *
-      * The `ack` parameter can be used to signal to the
-      * [[Limiter]] that backpressure should be applied depending on the
-      * result of `job`. Note that this will only change the
-      * processing rate: it won't do any error handling for you. Also
-      * see [[BackPressure]]
+
       */
-    def submit[A](
-        job: F[A],
-        priority: Int = 0,
-        ack: BackPressure.Ack[A] = BackPressure.never[A]): F[Unit]
+    def submit[A](job: F[A], priority: Int = 0): F[Unit]
 
     /**
       * Obtains a snapshot of the current number of jobs waiting to be
@@ -82,23 +75,16 @@ object core {
       * concurrent call submits a job, and they are all started at a
       * rate which is no higher then the maximum rate you specify when
       * constructing a [[Limiter]].
-      *
-      * The `ack` parameter can be used to signal to the
-      * [[Limiter]] that backpressure should be applied depending on the
-      * result of `job`. Note that this will only change the
-      * processing rate: it won't do any error handling for you. Also
-      * see [[BackPressure]]
       */
     // TODO do I want to allow cancelation here?
     def await[F[_]: Concurrent: Limiter, A](
         job: F[A],
-        priority: Int = 0,
-        ack: BackPressure.Ack[A] = BackPressure.never[A]): F[A] =
+        priority: Int = 0
+    ): F[A] =
       Deferred[F, Either[Throwable, A]] flatMap { p =>
         Limiter[F].submit(
           job.attempt.flatTap(p.complete).rethrow,
-          priority,
-          ack
+          priority
         ) *> p.get.rethrow
       }
 
@@ -107,17 +93,6 @@ object core {
       * submitted by the it, which are started at a rate no higher
       * than `1 / period`
       *
-      * Every time a job signals backpressure is needed, the [[Limiter]]
-      * will adjust its current rate by applying `backOff` to it. This
-      * means the rate will be adjusted by calling `backOff`
-      * repeatedly whenever multiple consecutive jobs signal for
-      * backpressure, and reset to its original value when a job
-      * signals backpressure is no longer needed.
-      *
-      * Note that since jobs submitted to the [[Limiter]] are processed
-      * asynchronously, rate changes might not propagate instantly when
-      * the rate is smaller than the job completion time. However, the
-      * rate will eventually converge to its most up-to-date value.
       *
       * Additionally, `n` allows you to place a bound on the maximum
       * number of jobs allowed to queue up while waiting for
@@ -129,21 +104,17 @@ object core {
       */
     def start[F[_]: Concurrent: Timer](
         period: FiniteDuration,
-        backOff: FiniteDuration => FiniteDuration,
         n: Int): Resource[F, Limiter[F]] = Resource {
       (
-        Queue.bounded[F, F[BackPressure]](n),
+        Queue.bounded[F, F[Unit]](n),
         Deferred[F, Unit],
         SignallingRef[F, FiniteDuration](period)
       ).mapN {
         case (queue, stop, interval_) =>
           def limiter = new Limiter[F] {
-            def submit[A](
-                job: F[A],
-                priority: Int,
-                ack: BackPressure.Ack[A]): F[Unit] =
+            def submit[A](job: F[A], priority: Int): F[Unit] =
               queue.enqueue(
-                job.attempt map ack,
+                job.void,
                 priority
               )
 
@@ -154,18 +125,11 @@ object core {
             def reset: F[Unit] = interval.set(period)
           }
 
-          def backPressure(limiter: Limiter[F]): F[BackPressure] => F[Unit] =
-            _.map(_.slowDown) ifM (
-              ifTrue = limiter.interval.modify(i => backOff(i) -> i).void,
-              ifFalse = limiter.interval.set(period)
-            )
-
           // `job` needs to be executed asynchronously so that long
           // running jobs don't interfere with the frequency of pulling
           // from the queue. It also means that a failed `job` doesn't
           // cause the overall processing to fail
-          def exec(job: F[BackPressure]): F[Unit] =
-            backPressure(limiter).apply(job).start.void
+          def exec(job: F[Unit]): F[Unit] = job.start.void
 
           def rate: Stream[F, Unit] =
             Stream
@@ -191,15 +155,7 @@ object core {
     def noOp[F[_]: Concurrent]: F[Limiter[F]] =
       SignallingRef[F, FiniteDuration](0.seconds).map { interval_ =>
         new Limiter[F] {
-          def submit[A](
-              job: F[A],
-              priority: Int,
-              ack: BackPressure.Ack[A]): F[Unit] = job.void
-
-          def await[A](
-              job: F[A],
-              priority: Int = 0,
-              ack: BackPressure.Ack[A]): F[A] = job
+          def submit[A](job: F[A], priority: Int): F[Unit] = job.void
 
           def pending: F[Int] = 0.pure[F]
 

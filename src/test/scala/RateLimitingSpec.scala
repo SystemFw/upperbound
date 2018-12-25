@@ -20,7 +20,7 @@ class RateLimitingSpec extends BaseSpec {
         productionRate = 1 every 1.millis,
         producers = 4,
         jobsPerProducer = 100,
-        backPressure = BackPressure.never,
+        slowDown = _ => false,
         jobCompletion = 0.seconds,
         samplingWindow = samplingWindow
       )
@@ -43,7 +43,7 @@ class RateLimitingSpec extends BaseSpec {
         productionRate = 1 every 300.millis,
         producers = 1,
         jobsPerProducer = 100,
-        backPressure = BackPressure.never,
+        slowDown = _ => false,
         jobCompletion = 0.seconds,
         samplingWindow = samplingWindow
       )
