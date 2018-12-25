@@ -44,6 +44,29 @@ object core {
         ack: BackPressure.Ack[A] = BackPressure.never[A]): F[Unit]
 
     /**
+      * Obtains a snapshot of the current number of jobs waiting to be
+      * executed. May be out of date the instant after it is
+      * retrieved.
+      */
+    def pending: F[Int]
+
+    /**
+      * Allows to sample, change or react to changes to the current interval between two tasks.
+      */
+    def interval: SignallingRef[F, FiniteDuration]
+
+    /**
+      * Resets the interval to the one set on creation of this [[Limiter]]
+      */
+    def reset: F[Unit]
+  }
+
+  object Limiter {
+
+    /** Summoner */
+    def apply[F[_]](implicit l: Limiter[F]): Limiter[F] = l
+
+    /**
       * Returns an `F[A]` which represents the action of submitting
       * `fa` to the [[Limiter]] with the given priority, and waiting for
       * its result. A higher number means a higher priority. The
@@ -66,30 +89,18 @@ object core {
       * processing rate: it won't do any error handling for you. Also
       * see [[BackPressure]]
       */
-    def await[A](
+    // TODO do I want to allow cancelation here?
+    def await[F[_]: Concurrent: Limiter, A](
         job: F[A],
         priority: Int = 0,
-        ack: BackPressure.Ack[A] = BackPressure.never[A]): F[A]
-
-    /**
-      * Obtains a snapshot of the current number of jobs waiting to be
-      * executed. May be out of date the instant after it is
-      * retrieved.
-      */
-    def pending: F[Int]
-
-    /**
-      * Allows to sample, change or react to changes to the current interval between two tasks.
-      */
-    def interval: SignallingRef[F, FiniteDuration]
-
-    /**
-      * Resets the interval to the one set on creation of this [[Limiter]]
-      */
-    def reset: F[Unit]
-  }
-
-  object Limiter {
+        ack: BackPressure.Ack[A] = BackPressure.never[A]): F[A] =
+      Deferred[F, Either[Throwable, A]] flatMap { p =>
+        Limiter[F].submit(
+          job.attempt.flatTap(p.complete).rethrow,
+          priority,
+          ack
+        ) *> p.get.rethrow
+      }
 
     /**
       * Creates a new [[Limiter]] and starts processing the jobs
@@ -135,17 +146,6 @@ object core {
                 job.attempt map ack,
                 priority
               )
-
-            def await[A](
-                job: F[A],
-                priority: Int,
-                ack: BackPressure.Ack[A]): F[A] =
-              Deferred[F, Either[Throwable, A]] flatMap { p =>
-                queue.enqueue(
-                  job.attempt.flatTap(p.complete).map(ack),
-                  priority
-                ) *> p.get.rethrow
-              }
 
             def pending: F[Int] = queue.size
 
