@@ -3,11 +3,12 @@ package upperbound
 import fs2._
 import cats.effect._
 import cats.effect.concurrent.Ref
-import cats.effect.implicits._
 import cats.syntax.all._
 
 import scala.collection.immutable.Queue
 import scala.concurrent.duration._
+
+import syntax.backpressure._
 
 object TestScenarios {
   case class TestingConditions(
@@ -17,7 +18,7 @@ object TestScenarios {
       producers: Int,
       jobsPerProducer: Int,
       jobCompletion: FiniteDuration,
-      slowDown: Either[Throwable, Int] => Boolean,
+      backPressure: BackPressure.Ack[Int],
       samplingWindow: FiniteDuration
   )
 
@@ -72,18 +73,16 @@ object TestScenarios {
               .take(t.producers)
               .parJoin(t.producers)
 
-        def backOff(fa: F[Int])(implicit L: Limiter[F]) =
-          backpressure.withBackoff(t.backOff, t.slowDown, fa)
-
         def experiment = Limiter.start[F](t.desiredRate).use {
           implicit limiter =>
             def producer: Stream[F, Unit] =
               Stream
                 .range(0, t.jobsPerProducer)
-                .map(i => backOff(job(i))) evalMap { x =>
-                record(submissionTimes) *> limiter
-                  .submit(job = x, priority = 0)
-              }
+                .map(job(_).withBackoff(t.backOff, t.backPressure))
+                .evalMap { x =>
+                  record(submissionTimes) *> limiter
+                    .submit(job = x, priority = 0)
+                }
 
             Stream
               .sleep[F](t.samplingWindow)

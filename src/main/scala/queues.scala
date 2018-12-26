@@ -6,7 +6,7 @@ import cats.effect.implicits._
 import fs2._
 import cats.collections.Heap
 
-object queues {
+private[upperbound] object queues {
 
   /**
     * Non-blocking, concurrent, MPSC priority queue.

@@ -18,7 +18,7 @@ class BackPressureSpec extends BaseSpec {
   val T = 200
   val backOffConditions = TestingConditions(
     backOff = x => x,
-    slowDown = _ => false,
+    backPressure = BackPressure.never,
     desiredRate = 1 every T.millis,
     productionRate = 1 every 1.millis,
     producers = 1,
@@ -37,7 +37,7 @@ class BackPressureSpec extends BaseSpec {
 
       val conditions = backOffConditions.copy(
         backOff = linearBackOff,
-        slowDown = everyJob
+        backPressure = BackPressure.Ack(_ => true)
       )
 
       val res = mkScenario[IO](conditions).unsafeToFuture
@@ -62,7 +62,7 @@ class BackPressureSpec extends BaseSpec {
 
       val conditions = backOffConditions.copy(
         backOff = constantBackOff,
-        slowDown = everyOtherJob
+        backPressure = BackPressure.Ack(everyOtherJob)
       )
 
       val res = mkScenario[IO](conditions).unsafeToFuture
