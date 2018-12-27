@@ -36,7 +36,7 @@ class BackPressure[F[_], A](job: F[A]) {
       if (ack.slowDown(x))
         limiter.interval.modify(i => backOff(i) -> i).void
       else
-        limiter.reset
+        limiter.interval.set(limiter.initial)
     }.rethrow
 }
 object BackPressure {

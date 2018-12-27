@@ -46,9 +46,9 @@ trait Limiter[F[_]] {
   def interval: SignallingRef[F, FiniteDuration]
 
   /**
-    * Resets the interval to the one set on creation of this [[Limiter]]
+    * The interval set on creation of this [[Limiter]]
     */
-  def reset: F[Unit]
+  def initial: FiniteDuration
 }
 
 object Limiter {
@@ -126,7 +126,7 @@ object Limiter {
 
           def interval: SignallingRef[F, FiniteDuration] = interval_
 
-          def reset: F[Unit] = interval.set(maxRate.period)
+          def initial: FiniteDuration = maxRate.period
         }
 
         // `job` needs to be executed asynchronously so that long
@@ -165,7 +165,7 @@ object Limiter {
 
         def interval: SignallingRef[F, FiniteDuration] = interval_
 
-        def reset: F[Unit] = interval.set(0.seconds)
+        def initial: FiniteDuration = 0.seconds
       }
     }
 
