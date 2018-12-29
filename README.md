@@ -13,16 +13,15 @@ To get **upperbound**, add the following line to your `build.sbt`
 libraryDependencies += "org.systemfw" %% "upperbound" % "version"
 ```
 
-You can find the latest version in the [releases](https://github.com/SystemFw/upperbound/releases) tab.
+You can find the latest version in the [releases](https://github.com/SystemFw/upperbound/releases) tab.__
 **upperbound** depends on `fs2`, `cats`, `cats-effect` and `cats-collections`.
 
 **Note:**
 
 For the time being binary compatibility is **not**
-guaranteed. This is not a problem when using **upperbound** for
-applications (which is where you would mostly use a rate limiter
-anyway), but risky if used in libraries. Binary compatibility will be
-guaranteed in the future.
+guaranteed. This is not a problem for usage in applications (which is
+where you would mostly use a rate limiter anyway), but risky if used
+in libraries. Binary compatibility will be guaranteed in the future.
 
 ## Design principles
 
@@ -105,20 +104,19 @@ jobs waiting goes below `n` again.
 
 The reason `start` returns a `cats.effect.Resource` is so that
 processing can be stopped gracefully when the `Limiter`'s lifetime is
-over.__
+over.
 To assemble your program, all the places that need limiting at the
 same rate should take a `Limiter` as an argument, which is then
 created at the end of a region of sharing (typically `main`) and
 injected via `Limiter.start(...).use` or
 `Stream.resource(Limiter.start(...)).flatMap`. If this sentence didn't
-make sense to you, it's recommended to watch [this
-talk](https://github.com/SystemFw/scala-italy-201).
+make sense to you, it's recommended to watch [this talk](https://github.com/SystemFw/scala-italy-201).
 
 
 **Note:**
 
 It's up to you whether you want to pass the `Limiter` algebra
-implicitly (as an `F[_]: Limiter` bound) or explicitly.__
+implicitly (as an `F[_]: Limiter` bound) or explicitly.  
 My position is that it's ok to pass algebras implicitly _as long as
 the instance is made implicit at call site_, as close as possible to
 where it's actually injected. This avoids any problems related to
@@ -126,7 +124,7 @@ mixing things up, and is essentially equivalent to having an instance
 of your algebra for a newtype over Kleisli.
 
 Reasonable people might disagree however, and I myself pass algebras
-around both ways, in different codebases.__
+around both ways, in different codebases.  
 **upperbound** is slightly skewed towards the `F[_]: Limiter` style:
 internal combinators are expressed that way, and `Limiter` has a
 summoner method to allow `Limiter[F].submit`
@@ -143,7 +141,7 @@ object Limiter {
 ```
 
 `await` looks very similar to `submit`, except its semantics are
-blocking: the returned `F[A]` only completes when the `job` has
+blocking: the returned `F[A]` only completes when `job` has
 finished its execution. Note however, that the blocking is only semantic,
 no actual threads are blocked by the implementation.
 
@@ -151,7 +149,7 @@ no actual threads are blocked by the implementation.
 
 `Limiter[F].interval` offers flexible control over the rate, which can
 be used as a mechanism for applying backpressure based on the result
-of a specific job (e.g. a REST call that got rejected upstream).__
+of a specific job (e.g. a REST call that got rejected upstream).  
 Although this can be implemented entirely in user land, **upperbound**
 provides some backpressure helpers and combinators out of the box.
 
@@ -167,7 +165,7 @@ object BackPressure {
 }
 ```
 
-`withBackoff` enriches an `F[A]` with a `Limiter` constraint with the ability to apply backpressure to the `Limiter`:__
+`withBackoff` enriches an `F[A]` with a `Limiter` constraint with the ability to apply backpressure to the `Limiter`:  
 Every time a job signals backpressure is needed through `ack`, the `Limiter` will
 adjust its current rate by applying `backOff` to it. This means the
 rate will be adjusted by calling `backOff` repeatedly whenever
@@ -182,7 +180,7 @@ eventually converge to its most up-to-date value.
 `BackPressure.Ack[A]` is a wrapper over  `Either[Throwable, A] => Boolean`,
 and it's used to assert
 that backpressure is needed based on a specific result (or error) of
-the submitted job. You can write your own `Ack`s, but **upperbound** provides
+the submitted job. You can write your own `Ack`s, but the library provides
 some for you, including:
 
 - `BackPressure.onAllErrors`: signal backpressure every time a job
@@ -196,7 +194,7 @@ some for you, including:
 Note that `withBackoff` only transforms the input job, you still need
 to actually `submit` or `await` yourself. This is done to allow
 further combinators to operate on a job as a chain of `F[A] => F[A]`
-functions before actually submitting to the `Limiter`.__
+functions before actually submitting to the `Limiter`.  
 It's also available as syntax:
   
 ``` scala
@@ -214,7 +212,7 @@ def prog[F[_]: Limiter, A](fa: F[A]): F[Unit] =
 
 Finally, please be aware that the backpressure support doesn't interfere with
 your own error handling, nor does any error handling (e.g. retrying)
-for you. Also note ha
+for you.
 
 
 ### Test limiter
