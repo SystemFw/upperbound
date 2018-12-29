@@ -34,13 +34,6 @@ trait Limiter[F[_]] {
   def submit[A](job: F[A], priority: Int = 0): F[Unit]
 
   /**
-    * Obtains a snapshot of the current number of jobs waiting to be
-    * executed. May be out of date the instant after it is
-    * retrieved.
-    */
-  def pending: F[Int]
-
-  /**
     * Allows to sample, change or react to changes to the current interval between two tasks.
     */
   def interval: SignallingRef[F, FiniteDuration]
@@ -49,6 +42,13 @@ trait Limiter[F[_]] {
     * The interval set on creation of this [[Limiter]]
     */
   def initial: FiniteDuration
+
+  /**
+    * Obtains a snapshot of the current number of jobs waiting to be
+    * executed. May be out of date the instant after it is
+    * retrieved.
+    */
+  def pending: F[Int]
 }
 
 object Limiter {
