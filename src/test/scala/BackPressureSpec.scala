@@ -1,23 +1,14 @@
 package upperbound
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect._
 import fs2.Stream
-
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import org.specs2.mutable.Specification
 
-class BackPressureSpec(implicit ec: ExecutionContext)
-    extends Specification
-    with TestScenarios {
+import syntax.rate._
 
-  implicit val Timer: Timer[IO] = IO.timer(ec)
-  implicit val ContextShift: ContextShift[IO] = IO.contextShift(ec)
-
+class BackPressureSpec extends BaseSpec {
   val samplingWindow = 5.seconds
-  val description = "Backpressure"
-
-  import syntax.rate._
+  import TestScenarios._
 
   // Due to its asynchronous/concurrent nature, the backoff
   // functionality cannot guarantee instantaneous propagation of rate
@@ -36,41 +27,54 @@ class BackPressureSpec(implicit ec: ExecutionContext)
     samplingWindow = samplingWindow
   )
 
-  "Backpressure" should {
+  "Backpressure should" - {
     "follow the provided backOff function" in {
+      val E = new Env
+      import E._
 
       def linearBackOff: FiniteDuration => FiniteDuration = _ + T.millis
-      def everyJob: BackPressure.Ack[Int] = _ => BackPressure(true)
+      def everyJob: Either[Throwable, Int] => Boolean = _ => true
 
       val conditions = backOffConditions.copy(
         backOff = linearBackOff,
-        backPressure = everyJob
+        backPressure = BackPressure.Ack(_ => true)
       )
 
-      val res = mkScenario(conditions).unsafeRunSync
-      val measuredBackOff = res.jobExecutionMetrics.diffs.map(_ / T)
-      val linear =
-        Stream.iterate(1)(_ + 1).take(measuredBackOff.length).toVector
+      val res = mkScenario[IO](conditions).unsafeToFuture
+      env.tick(samplingWindow)
 
-      measuredBackOff must beEqualTo(linear)
+      res.map { r =>
+        val measuredBackOff = r.jobExecutionMetrics.diffs.map(_ / T)
+        val linear =
+          Stream.iterate(1)(_ + 1).take(measuredBackOff.length).toVector
+
+        assert(measuredBackOff === linear)
+      }
     }
 
     "only apply when jobs are signalling for it" in {
+      val E = new Env
+      import E._
+
       def constantBackOff: FiniteDuration => FiniteDuration = _ => T.millis * 2
-      def everyOtherJob: BackPressure.Ack[Int] =
-        i => BackPressure(i.right.get % 2 == 0)
+      def everyOtherJob: Either[Throwable, Int] => Boolean =
+        _.right.get % 2 == 0
 
       val conditions = backOffConditions.copy(
         backOff = constantBackOff,
-        backPressure = everyOtherJob
+        backPressure = BackPressure.Ack(everyOtherJob)
       )
 
-      val res = mkScenario(conditions).unsafeRunSync
-      val measuredBackOff = res.jobExecutionMetrics.diffs.map(_ / T)
-      val alternating =
-        Stream(1, 2).repeat.take(measuredBackOff.length).toVector
+      val res = mkScenario[IO](conditions).unsafeToFuture
+      env.tick(samplingWindow)
 
-      measuredBackOff must beEqualTo(alternating)
+      res.map { r =>
+        val measuredBackOff = r.jobExecutionMetrics.diffs.map(_ / T)
+        val alternating =
+          Stream(1, 2).repeat.take(measuredBackOff.length).toVector
+
+        assert(measuredBackOff === alternating)
+      }
     }
   }
 }

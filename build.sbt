@@ -12,8 +12,9 @@ lazy val root = (project in file(".")).settings(
 lazy val commonSettings = Seq(
   organization := "org.systemfw",
   name := "upperbound",
-  scalaVersion := "2.11.11",
-  crossScalaVersions := Seq("2.11.11", "2.12.1")
+  scalaVersion := "2.12.6",
+  crossScalaVersions := Seq("2.11.12", scalaVersion.value),
+  scalafmtOnCompile := true
 )
 
 lazy val consoleSettings = Seq(
@@ -38,7 +39,7 @@ lazy val compilerOptions =
   )
 
 lazy val typeSystemEnhancements =
-  addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.3")
+  addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.8")
 
 def dep(org: String)(version: String)(modules: String*) =
   Seq(modules: _*) map { name =>
@@ -47,32 +48,22 @@ def dep(org: String)(version: String)(modules: String*) =
 
 lazy val dependencies =
   libraryDependencies ++= Seq(
-    "co.fs2" %% "fs2-core" % "1.0.0",
+    "co.fs2" %% "fs2-core" % "1.0.2",
     "org.typelevel" %% "cats-core" % "1.4.0",
-    "org.typelevel" %% "dogs-core" % "0.6.10",
-    "org.typelevel" %% "cats-effect" % "1.0.0"
+    "org.typelevel" %% "cats-effect" % "1.1.0",
+    "org.typelevel" %% "cats-collections-core" % "0.7.0"
   )
 
 lazy val tests = {
-  val dependencies = {
-    val specs2 = dep("org.specs2")("3.8.9")(
-      "specs2-core",
-      "specs2-scalacheck"
-    )
-
-    val mixed = Seq(
-      "org.scalacheck" %% "scalacheck" % "1.13.4",
-      "org.scalactic" %% "scalactic" % "3.0.1"
-    )
-
+  val dependencies =
     libraryDependencies ++= Seq(
-      specs2,
-      mixed
-    ).flatten.map(_ % "test")
-  }
+      "org.scalacheck" %% "scalacheck" % "1.13.4",
+      "org.scalatest" %% "scalatest" % "3.0.5",
+      "org.typelevel" %% "cats-effect-laws" % "1.0.0"
+    ).map(_ % "test")
 
   val frameworks =
-    testFrameworks := Seq(TestFrameworks.Specs2)
+    testFrameworks := Seq(TestFrameworks.ScalaTest)
 
   Seq(dependencies, frameworks)
 }
