@@ -14,7 +14,7 @@ To get **upperbound**, add the following line to your `build.sbt`
 libraryDependencies += "org.systemfw" %% "upperbound" % "version"
 ```
 
-You can find the latest version in the [releases](https://github.com/SystemFw/upperbound/releases) tab.__
+You can find the latest version in the [releases](https://github.com/SystemFw/upperbound/releases) tab.  
 **upperbound** depends on `fs2`, `cats`, `cats-effect` and `cats-collections`.
 
 **Note:**
