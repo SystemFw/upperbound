@@ -14,14 +14,16 @@ private[upperbound] object queues {
   trait Queue[F[_], A] {
 
     /**
-      * Enqueues an element. A higher number means higher priority
+      * Enqueues an element. A higher number means higher priority.
+      * Fails if the queue is full.
       */
     def enqueue(a: A, priority: Int): F[Unit]
 
     /**
-      * Tries to dequeue the higher priority element.  In case there
+      * Dequeues the highest priority element. In case there
       * are multiple elements with the same priority, they are
-      * dequeued in FIFO order
+      * dequeued in FIFO order.
+      * Semantically blocks if the queue is empty.
       */
     def dequeue: F[A]
 
@@ -39,6 +41,67 @@ private[upperbound] object queues {
   }
 
   object Queue {
+    type State[F[_], A] = Either[Deferred[F, A], IQueue[A]]
+
+    def apply[F[_]: Concurrent, A](maxSize: Int): F[Queue[F, A]] =
+      Ref.of[F, State[F, A]](IQueue.empty.asRight).map { state =>
+        new Queue[F, A] {
+          def enqueue(a: A, priority: Int): F[Unit] =
+            state
+              .modify {
+                case Right(queue) =>
+                  if (queue.size < maxSize)
+                    queue.enqueue(a, priority).asRight -> ().pure[F]
+                  else
+                    queue.asRight -> Sync[F].raiseError[Unit](
+                      new LimitReachedException)
+                case Left(consumerWaiting) =>
+                  IQueue.empty.asRight -> consumerWaiting.complete(a)
+              }
+              .flatten
+              .uncancelable
+
+          def dequeue: F[A] =
+            Deferred[F, A].bracketCase(wait =>
+              state.modify {
+                case Right(queue) =>
+                  queue.newDequeue match {
+                    case None => wait.asLeft -> wait.get
+                    case Some((v, tail)) => tail.asRight -> v.pure[F]
+                  }
+                case st @ Left(consumerWaiting) =>
+                  val error =
+                    "Protocol violation: concurrent consumers in a MPSC queue"
+                  st -> Sync[F].raiseError[A](new IllegalStateException(error))
+              }.flatten
+            //
+            ) {
+              case (_, ExitCase.Completed | ExitCase.Error(_)) => ().pure[F]
+              case (_, ExitCase.Canceled) =>
+                state.update {
+                  case s @ Right(_) => s
+                  case l @ Left(waiting) => IQueue.empty[A].asRight
+                }
+            }
+
+          def size = state.get.map {
+            case Left(_) => 0
+            case Right(v) => v.size
+          }
+        }
+      }
+
+//             Deferred[F, A].bracketCase(wait => // TODO bracket on interruption
+//  // .flatMap(_ => promise.get) -- interrupted before or during the get
+//             ){
+//             }
+
+//           def size: F[Int] = ???
+// //          state.get.map(_.size)
+//         ){
+
+//         }
+//       }
 
     /**
       * Unbounded size.
@@ -121,6 +184,12 @@ private[upperbound] object queues {
     def dequeue: Option[A] = queue.getMin.map(_.a)
 
     def dequeued: IQueue[A] = copy(queue = this.queue.remove)
+
+    def newDequeue: Option[(A, IQueue[A])] = queue.getMin.map { r =>
+      r.a -> copy(queue = this.queue.remove)
+    }
+
+    def size: Int = queue.size
   }
 
   object IQueue {
