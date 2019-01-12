@@ -110,7 +110,7 @@ object Limiter {
       n: Int = Int.MaxValue
   ): Resource[F, Limiter[F]] = Resource {
     (
-      Queue.bounded[F, F[Unit]](n),
+      Queue[F, F[Unit]](n),
       Deferred[F, Unit],
       SignallingRef[F, FiniteDuration](maxRate.period)
     ).mapN {

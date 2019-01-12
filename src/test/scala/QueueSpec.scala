@@ -106,43 +106,4 @@ class QueueSpec extends BaseSpec {
     env.tick(4.seconds)
     res.map(r => assert(r))
   }
-
-  // def prog[A](input: Vector[(A, Int)]) =
-  //   Stream
-  //     .eval(Queue[IO, Option[A]]())
-  //     .flatMap { queue =>
-  //       Stream
-  //         .emits(input)
-  //         .noneTerminate
-  //         .evalMap {
-  //           case Some((e, p)) => queue.enqueue(e.some, p)
-  //           case None => queue.enqueue(None, Int.MinValue)
-  //         }
-  //         .drain ++ queue.dequeueAll.unNoneTerminate
-  //     }
-  //     .compile
-  //     .toVector
-
-  // implicit class QueueOps[A](queue: Queue[IO, Option[A]]) {
-  //   def dequeueAllF: IO[Vector[A]] =
-  //     queue.dequeueAll.unNoneTerminate.compile.toVector
-
-  //   def enqueueAllF(elems: Vector[(A, Int)]): IO[Unit] =
-  //     Stream
-  //       .emits(elems)
-  //       .noneTerminate
-  //       .evalMap {
-  //         case Some((e, p)) => queue.enqueue(e.some, p)
-  //         case None => queue.enqueue(None, Int.MinValue)
-  //       }
-  //       .compile
-  //       .drain
-  // }
-
-  // def prog[A](input: Vector[(A, Int)]) =
-  //   for {
-  //     queue <- Queue[IO, Option[A]]()
-  //     _ <- queue enqueueAllF input
-  //     res <- queue.dequeueAllF
-  //   } yield res
 }
