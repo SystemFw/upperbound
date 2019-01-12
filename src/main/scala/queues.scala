@@ -14,10 +14,10 @@ private[upperbound] object queues {
   trait Queue[F[_], A] {
 
     /**
-      * Enqueues an element. A higher number means higher priority.
-      * Fails if the queue is full.
+      * Enqueues an element. A higher number means higher priority,
+      * with 0 as the default. Fails if the queue is full.
       */
-    def enqueue(a: A, priority: Int): F[Unit]
+    def enqueue(a: A, priority: Int = 0): F[Unit]
 
     /**
       * Dequeues the highest priority element. In case there
@@ -43,7 +43,8 @@ private[upperbound] object queues {
   object Queue {
     type State[F[_], A] = Either[Deferred[F, A], IQueue[A]]
 
-    def apply[F[_]: Concurrent, A](maxSize: Int): F[Queue[F, A]] =
+    def apply[F[_]: Concurrent, A](
+        maxSize: Int = Int.MaxValue): F[Queue[F, A]] =
       Ref.of[F, State[F, A]](IQueue.empty.asRight).map { state =>
         new Queue[F, A] {
           def enqueue(a: A, priority: Int): F[Unit] =

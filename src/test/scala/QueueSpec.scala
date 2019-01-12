@@ -3,15 +3,16 @@ package upperbound
 import fs2.Stream
 import cats.effect._
 import cats.syntax.all._
+import cats.instances.vector._
+import scala.concurrent.duration._
 
 import queues.Queue
 
 class QueueSpec extends BaseSpec {
 
-  import DefaultEnv._
+  "A Queue should" - {
 
-  "An unbounded Queue should" - {
-
+    import DefaultEnv._
     // Using property based testing for this assertion greatly
     // increases the chance of testing all the concurrent
     // interleavings.
@@ -19,9 +20,10 @@ class QueueSpec extends BaseSpec {
       (fst: Int, snd: Int) =>
         def concurrentProducerConsumer =
           for {
-            queue <- Stream.eval(Queue.unbounded[IO, Int])
+            queue <- Stream.eval(Queue[IO, Int]())
+
             consumer = Stream.eval(queue.dequeue)
-            producer = Stream.eval(fst.pure[IO] <* queue.enqueue(snd, 0))
+            producer = Stream.eval(fst.pure[IO] <* queue.enqueue(snd))
             result <- consumer.merge(producer)
           } yield result
 
@@ -32,24 +34,40 @@ class QueueSpec extends BaseSpec {
 
     "dequeue the highest priority elements first" in forAll {
       (elems: Vector[Int]) =>
-        def input = elems.zipWithIndex
+        def prog =
+          Queue[IO, Int]()
+            .map { q =>
+              Stream
+                .emits(elems)
+                .zipWithIndex
+                .evalMap { case (e, p) => q.enqueue(e, p.toInt) }
+                .drain ++ q.dequeueAll.take(elems.size)
+            }
+            .flatMap(_.compile.toVector)
 
-        assert(prog(input).unsafeRunSync === elems.reverse)
+        assert(prog.unsafeRunSync === elems.reverse)
     }
 
     "dequeue elements with the same priority in FIFO order" in forAll {
       (elems: Vector[Int]) =>
-        def input = elems.map(_ -> 0)
+        def prog =
+          Queue[IO, Int]()
+            .map { q =>
+              Stream
+                .emits(elems)
+                .evalMap(q.enqueue(_))
+                .drain ++ q.dequeueAll
+                .take(elems.size)
+            }
+            .flatMap(_.compile.toVector)
 
-        assert(prog(input).unsafeRunSync === elems)
+        assert(prog.unsafeRunSync === elems)
     }
-  }
 
-  "A bounded Queue should" - {
     "fail an enqueue attempt if the queue is full" in {
       def prog =
         for {
-          q <- Queue.bounded[IO, Int](1)
+          q <- Queue[IO, Int](1)
           _ <- q.enqueue(1, 0)
           _ <- q.enqueue(1, 0)
         } yield ()
@@ -60,7 +78,7 @@ class QueueSpec extends BaseSpec {
     "successfully enqueue after dequeueing from a full queue" in {
       def prog =
         for {
-          q <- Queue.bounded[IO, Int](1)
+          q <- Queue[IO, Int](1)
           _ <- q.enqueue(1, 0)
           _ <- q.enqueue(2, 0).attempt
           _ <- q.dequeue
@@ -72,26 +90,59 @@ class QueueSpec extends BaseSpec {
     }
   }
 
-  implicit class QueueOps[A](queue: Queue[IO, Option[A]]) {
-    def dequeueAllF: IO[Vector[A]] =
-      queue.dequeueAll.unNoneTerminate.compile.toVector
+  "If a dequeue gets canceled before an enqueue, no elements are lost in the next dequeue" in {
+    val E = new Env
+    import E._
 
-    def enqueueAllF(elems: Vector[(A, Int)]): IO[Unit] =
-      Stream
-        .emits(elems)
-        .noneTerminate
-        .evalMap {
-          case Some((e, p)) => queue.enqueue(e.some, p)
-          case None => queue.enqueue(None, Int.MinValue)
-        }
-        .compile
-        .drain
+    def prog =
+      for {
+        q <- Queue[IO, Unit]()
+        _ <- q.dequeue.timeout(2.second).attempt
+        _ <- q.enqueue(())
+        _ <- q.dequeue.timeout(1.second)
+      } yield true
+
+    val res = prog.unsafeToFuture
+    env.tick(4.seconds)
+    res.map(r => assert(r))
   }
 
-  def prog[A](input: Vector[(A, Int)]) =
-    for {
-      queue <- Queue.unbounded[IO, Option[A]]
-      _ <- queue enqueueAllF input
-      res <- queue.dequeueAllF
-    } yield res
+  // def prog[A](input: Vector[(A, Int)]) =
+  //   Stream
+  //     .eval(Queue[IO, Option[A]]())
+  //     .flatMap { queue =>
+  //       Stream
+  //         .emits(input)
+  //         .noneTerminate
+  //         .evalMap {
+  //           case Some((e, p)) => queue.enqueue(e.some, p)
+  //           case None => queue.enqueue(None, Int.MinValue)
+  //         }
+  //         .drain ++ queue.dequeueAll.unNoneTerminate
+  //     }
+  //     .compile
+  //     .toVector
+
+  // implicit class QueueOps[A](queue: Queue[IO, Option[A]]) {
+  //   def dequeueAllF: IO[Vector[A]] =
+  //     queue.dequeueAll.unNoneTerminate.compile.toVector
+
+  //   def enqueueAllF(elems: Vector[(A, Int)]): IO[Unit] =
+  //     Stream
+  //       .emits(elems)
+  //       .noneTerminate
+  //       .evalMap {
+  //         case Some((e, p)) => queue.enqueue(e.some, p)
+  //         case None => queue.enqueue(None, Int.MinValue)
+  //       }
+  //       .compile
+  //       .drain
+  // }
+
+  // def prog[A](input: Vector[(A, Int)]) =
+  //   for {
+  //     queue <- Queue[IO, Option[A]]()
+  //     _ <- queue enqueueAllF input
+  //     res <- queue.dequeueAllF
+  //   } yield res
 }
