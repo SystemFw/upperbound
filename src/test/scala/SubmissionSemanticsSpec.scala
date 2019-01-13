@@ -18,7 +18,9 @@ class SubmissionSemanticsSpec extends BaseSpec {
           for {
             complete <- Ref.of[IO, Boolean](false)
             _ <- Limiter.start[IO](1 every 10.seconds).use { limiter =>
-              limiter submit complete.set(true)
+              // the first is picked up when the limiter starts
+              // the other exercises the scenario we care about
+              limiter.submit(IO.unit) >> limiter.submit(complete.set(true))
             }
             res <- complete.get
           } yield res
@@ -61,18 +63,17 @@ class SubmissionSemanticsSpec extends BaseSpec {
 
     "when too many jobs have been submitted should" - {
       "reject new jobs immediately" in {
-        def prog = Limiter.start[IO](1 every 10.seconds, n = 0).use {
-          implicit limiter =>
-            Limiter.await(IO.unit)
-        }
-
-        def prog2 = Limiter.start[IO](1 every 10.seconds, n = 0).use {
-          limiter =>
-            limiter submit IO.unit
-        }
+        def prog =
+          Limiter
+            .start[IO](1 every 10.seconds, n = 1)
+            .use { limiter =>
+              val task = limiter.submit(IO.unit)
+              // the first is picked up when the limiter starts
+              // the other two bring the pending tasks over the limit
+              task >> task >> task
+            }
 
         assertThrows[LimitReachedException](prog.unsafeRunSync)
-        assertThrows[LimitReachedException](prog2.unsafeRunSync)
       }
     }
   }

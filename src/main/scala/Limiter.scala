@@ -86,7 +86,9 @@ object Limiter {
   ): F[A] =
     Deferred[F, Either[Throwable, A]] flatMap { p =>
       Limiter[F].submit(
-        job.attempt.flatTap(p.complete).rethrow,
+        job.attempt
+          .flatTap(p.complete)
+          .rethrow, // TODO does it make sense to rethrow here?
         priority
       ) *> p.get.rethrow
     }
@@ -103,52 +105,56 @@ object Limiter {
     * [[LimitReachedException]], so that you can in turn signal for
     * backpressure downstream. Processing restarts as soon as the
     * number of jobs waiting goes below `n` again.
-    * `n` defaults to `Int.MaxValue` if not specified.
+    * `n` defaults to `Int.MaxValue` if not specified. Must be > 0.
     */
   def start[F[_]: Concurrent: Timer](
       maxRate: Rate,
       n: Int = Int.MaxValue
-  ): Resource[F, Limiter[F]] = Resource {
-    (
-      Queue[F, F[Unit]](n),
-      Deferred[F, Unit],
-      SignallingRef[F, FiniteDuration](maxRate.period)
-    ).mapN {
-      case (queue, stop, interval_) =>
-        def limiter = new Limiter[F] {
-          def submit[A](job: F[A], priority: Int): F[Unit] =
-            queue.enqueue(
-              job.void,
-              priority
-            )
+  ): Resource[F, Limiter[F]] = {
+    assert(n > 0, s"n must be > 0, was $n")
 
-          def pending: F[Int] = queue.size
+    Resource {
+      (
+        Queue[F, F[Unit]](n),
+        Deferred[F, Unit],
+        SignallingRef[F, FiniteDuration](maxRate.period)
+      ).mapN {
+        case (queue, stop, interval_) =>
+          def limiter = new Limiter[F] {
+            def submit[A](job: F[A], priority: Int): F[Unit] =
+              queue.enqueue(
+                job.void,
+                priority
+              )
 
-          def interval: SignallingRef[F, FiniteDuration] = interval_
+            def pending: F[Int] = queue.size
 
-          def initial: FiniteDuration = maxRate.period
-        }
+            def interval: SignallingRef[F, FiniteDuration] = interval_
 
-        // `job` needs to be executed asynchronously so that long
-        // running jobs don't interfere with the frequency of pulling
-        // from the queue. It also means that a failed `job` doesn't
-        // cause the overall processing to fail
-        def exec(job: F[Unit]): F[Unit] = job.start.void
+            def initial: FiniteDuration = maxRate.period
+          }
 
-        def rate: Stream[F, Unit] =
-          Stream
-            .repeatEval(limiter.interval.get)
-            .flatMap(Stream.sleep[F])
+          // `job` needs to be executed asynchronously so that long
+          // running jobs don't interfere with the frequency of pulling
+          // from the queue. It also means that a failed `job` doesn't
+          // cause the overall processing to fail
+          def exec(job: F[Unit]): F[Unit] = job.start.void
 
-        def executor: Stream[F, Unit] =
-          queue.dequeueAll
-            .zipLeft(rate)
-            .evalMap(exec)
-            .interruptWhen(stop.get.attempt)
+          def rate: Stream[F, Unit] =
+            Stream
+              .repeatEval(limiter.interval.get)
+              .flatMap(Stream.sleep[F])
 
-        executor.compile.drain.start.void
-          .as(limiter -> stop.complete(()))
-    }.flatten
+          def executor: Stream[F, Unit] =
+            queue.dequeueAll
+              .zipLeft(rate)
+              .evalMap(exec)
+              .interruptWhen(stop.get.attempt)
+
+          executor.compile.drain.start.void
+            .as(limiter -> stop.complete(()))
+      }.flatten
+    }
   }
 
   /**
