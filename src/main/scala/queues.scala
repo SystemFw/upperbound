@@ -14,14 +14,16 @@ private[upperbound] object queues {
   trait Queue[F[_], A] {
 
     /**
-      * Enqueues an element. A higher number means higher priority
+      * Enqueues an element. A higher number means higher priority,
+      * with 0 as the default. Fails if the queue is full.
       */
-    def enqueue(a: A, priority: Int): F[Unit]
+    def enqueue(a: A, priority: Int = 0): F[Unit]
 
     /**
-      * Tries to dequeue the higher priority element.  In case there
+      * Dequeues the highest priority element. In case there
       * are multiple elements with the same priority, they are
-      * dequeued in FIFO order
+      * dequeued in FIFO order.
+      * Semantically blocks if the queue is empty.
       */
     def dequeue: F[A]
 
@@ -39,70 +41,53 @@ private[upperbound] object queues {
   }
 
   object Queue {
+    type State[F[_], A] = Either[Deferred[F, A], IQueue[A]]
 
-    /**
-      * Unbounded size.
-      * `dequeue` immediately fails if the queue is empty
-      */
-    def naive[F[_], A](implicit F: Concurrent[F]): F[Queue[F, A]] =
-      Ref[F].of(IQueue.empty[A]).map { qref =>
+    def apply[F[_]: Concurrent, A](
+        maxSize: Int = Int.MaxValue): F[Queue[F, A]] =
+      Ref.of[F, State[F, A]](IQueue.empty.asRight).map { state =>
         new Queue[F, A] {
           def enqueue(a: A, priority: Int): F[Unit] =
-            qref.update { _.enqueue(a, priority) }
+            state
+              .modify {
+                case Right(queue) =>
+                  if (queue.size < maxSize)
+                    queue.enqueue(a, priority).asRight -> ().pure[F]
+                  else
+                    queue.asRight -> Sync[F].raiseError[Unit](
+                      new LimitReachedException)
+                case Left(consumerWaiting) =>
+                  IQueue.empty.asRight -> consumerWaiting.complete(a)
+              }
+              .flatten
+              .uncancelable
 
           def dequeue: F[A] =
-            qref.modify { q =>
-              q.dequeued -> F.delay(q.dequeue.get)
-            }.flatten
+            Deferred[F, A].bracketCase(wait =>
+              state.modify {
+                case Right(queue) =>
+                  queue.dequeue match {
+                    case None => wait.asLeft -> wait.get
+                    case Some((v, tail)) => tail.asRight -> v.pure[F]
+                  }
+                case st @ Left(consumerWaiting) =>
+                  val error =
+                    "Protocol violation: concurrent consumers in a MPSC queue"
+                  st -> Sync[F].raiseError[A](new IllegalStateException(error))
+              }.flatten
+            //
+            ) {
+              case (_, ExitCase.Completed | ExitCase.Error(_)) => ().pure[F]
+              case (_, ExitCase.Canceled) =>
+                state.update {
+                  case s @ Right(_) => s
+                  case l @ Left(waiting) => IQueue.empty[A].asRight
+                }
+            }
 
-          def size: F[Int] =
-            qref.get.map(_.queue.size)
-        }
-      }
-
-    /**
-      * Unbounded size.
-      * `dequeue` blocks on empty queue until an element is available.
-      */
-    def unbounded[F[_], A](implicit F: Concurrent[F]): F[Queue[F, A]] =
-      Semaphore(0).flatMap { n =>
-        naive[F, A].map { q =>
-          new Queue[F, A] {
-            def enqueue(a: A, priority: Int): F[Unit] =
-              q.enqueue(a, priority).guarantee(n.release)
-
-            // This isn't safe wrt interruption in general, but we can
-            // get away with it because there is a single consumer, which
-            // only interrupts a dequeue when it is interrupted itself.
-            // TODO rewrite this with Ref + Deferred in any case, or ideally PubSub
-            def dequeue: F[A] =
-              n.acquire *> q.dequeue
-
-            def size = q.size
-          }
-        }
-      }
-
-    /**
-      * Bounded size.
-      * `dequeue` blocks on empty queue until an element is available.
-      * `enqueue` immediately fails if the queue is full.
-      */
-    def bounded[F[_], A](maxSize: Int)(
-        implicit F: Concurrent[F]): F[Queue[F, A]] =
-      Semaphore(maxSize.toLong).flatMap { permits =>
-        Queue.unbounded[F, A].map { queue =>
-          new Queue[F, A] {
-            def enqueue(a: A, priority: Int): F[Unit] =
-              permits.tryAcquire ifM (
-                ifTrue = queue.enqueue(a, priority),
-                ifFalse = F.raiseError(LimitReachedException())
-              )
-
-            def dequeue: F[A] =
-              queue.dequeue <* permits.release
-
-            def size = queue.size
+          def size = state.get.map {
+            case Left(_) => 0
+            case Right(v) => v.size
           }
         }
       }
@@ -118,9 +103,11 @@ private[upperbound] object queues {
       nextId + 1
     )
 
-    def dequeue: Option[A] = queue.getMin.map(_.a)
+    def dequeue: Option[(A, IQueue[A])] = queue.getMin.map { r =>
+      r.a -> copy(queue = this.queue.remove)
+    }
 
-    def dequeued: IQueue[A] = copy(queue = this.queue.remove)
+    def size: Int = queue.size
   }
 
   object IQueue {
