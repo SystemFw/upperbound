@@ -111,7 +111,7 @@ same rate should take a `Limiter` as an argument, which is then
 created at the end of a region of sharing (typically `main`) and
 injected via `Limiter.start(...).use` or
 `Stream.resource(Limiter.start(...)).flatMap`. If this sentence didn't
-make sense to you, it's recommended to watch [this talk](https://github.com/SystemFw/scala-italy-201).
+make sense to you, it's recommended to watch [this talk](https://github.com/SystemFw/scala-italy-2018).
 
 
 **Note:**
@@ -197,14 +197,14 @@ to actually `submit` or `await` yourself. This is done to allow
 further combinators to operate on a job as a chain of `F[A] => F[A]`
 functions before actually submitting to the `Limiter`.  
 It's also available as syntax:
-  
+
 ``` scala
 import scala.concurrent.duration._
 import upperbound._
 import upperbound.syntax.backpressure._
 
 
-def prog[F[_]: Limiter, A](fa: F[A]): F[Unit] = 
+def prog[F[_]: Limiter, A](fa: F[A]): F[Unit] =
   Limiter[F].submit {
     fa.withBackoff(_ + 1.second, Backpressure.onAllErrors)
   }
