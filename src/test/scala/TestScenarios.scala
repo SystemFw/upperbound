@@ -67,7 +67,7 @@ object TestScenarios {
 
         def pulse = Stream.fixedRate[F](t.productionRate.period)
 
-        def concurrentProducers: Sink[F, Unit] =
+        def concurrentProducers: Pipe[F, Unit, Unit] =
           producer =>
             Stream(producer zipLeft pulse).repeat
               .take(t.producers)
@@ -86,7 +86,7 @@ object TestScenarios {
 
             Stream
               .sleep[F](t.samplingWindow)
-              .concurrently(producer.to(concurrentProducers))
+              .concurrently(producer.through(concurrentProducers))
               .compile
               .drain
         }

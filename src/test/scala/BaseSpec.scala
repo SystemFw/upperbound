@@ -1,11 +1,12 @@
 package upperbound
 
-import org.scalatest._, prop.PropertyChecks
+import org.scalatest._
 import cats.effect._, laws.util.TestContext
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 abstract class BaseSpec
     extends AsyncFreeSpec
-    with PropertyChecks
+    with ScalaCheckPropertyChecks
     with OptionValues
     with EitherValues {
   class Env {
