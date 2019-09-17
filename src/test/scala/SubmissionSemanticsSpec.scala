@@ -1,10 +1,10 @@
 package upperbound
 
+import syntax.rate._
+
 import cats.syntax.all._
 import cats.effect._, concurrent.Ref
 import scala.concurrent.duration._
-
-import syntax.rate._
 
 class SubmissionSemanticsSpec extends BaseSpec {
   import DefaultEnv._

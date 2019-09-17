@@ -107,7 +107,7 @@ private[upperbound] object queues {
       r.a -> copy(queue = this.queue.remove)
     }
 
-    def size: Int = queue.size
+    def size: Int = queue.size.toInt
   }
 
   object IQueue {

@@ -1,9 +1,9 @@
 package upperbound
 
+import syntax.rate._
+
 import cats.effect._
 import scala.concurrent.duration._
-
-import syntax.rate._
 
 class RateLimitingSpec extends BaseSpec {
   val samplingWindow = 10.seconds
