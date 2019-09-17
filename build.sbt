@@ -12,8 +12,8 @@ lazy val root = (project in file(".")).settings(
 lazy val commonSettings = Seq(
   organization := "org.systemfw",
   name := "upperbound",
-  scalaVersion := "2.12.8",
-  crossScalaVersions := Seq("2.11.12", scalaVersion.value),
+  scalaVersion := "2.12.10",
+  crossScalaVersions := Seq("2.11.12", scalaVersion.value, "2.13.0"),
   scalafmtOnCompile := true
 )
 
@@ -22,8 +22,8 @@ lazy val consoleSettings = Seq(
   scalacOptions in (Compile, console) -= "-Ywarn-unused-import"
 )
 
-lazy val compilerOptions =
-  scalacOptions ++= Seq(
+lazy val compilerOptions = {
+  val commonOptions = Seq(
     "-unchecked",
     "-deprecation",
     "-encoding",
@@ -33,10 +33,14 @@ lazy val compilerOptions =
     "-language:implicitConversions",
     "-language:higherKinds",
     "-language:existentials",
-    "-Ypartial-unification",
-    "-Ywarn-unused-import",
     "-Ywarn-value-discard"
   )
+
+  scalacOptions ++= commonOptions ++ PartialFunction.condOpt(CrossVersion.partialVersion(scalaVersion.value)){
+    case Some((2, scalaMajor)) if scalaMajor <= 12 => Seq("-Ypartial-unification", "-Ywarn-unused-import")
+    case Some((2, scalaMajor)) if scalaMajor >= 13 => Seq()
+  }.toList.flatten
+}
 
 lazy val typeSystemEnhancements =
   addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3")
@@ -48,10 +52,10 @@ def dep(org: String)(version: String)(modules: String*) =
 
 lazy val dependencies =
   libraryDependencies ++= Seq(
-    "co.fs2" %% "fs2-core" % "1.0.5",
-    "org.typelevel" %% "cats-core" % "1.6.1",
-    "org.typelevel" %% "cats-effect" % "1.3.1",
-    "org.typelevel" %% "cats-collections-core" % "0.7.0"
+    "co.fs2" %% "fs2-core" % "2.0.0",
+    "org.typelevel" %% "cats-core" % "2.0.0",
+    "org.typelevel" %% "cats-effect" % "2.0.0",
+    "org.typelevel" %% "cats-collections-core" % "0.8.0"
   )
 
 lazy val tests = {
@@ -59,7 +63,7 @@ lazy val tests = {
     libraryDependencies ++= Seq(
       "org.scalacheck" %% "scalacheck" % "1.14.0",
       "org.scalatest" %% "scalatest" % "3.0.8",
-      "org.typelevel" %% "cats-effect-laws" % "1.3.1"
+      "org.typelevel" %% "cats-effect-laws" % "2.0.0"
     ).map(_ % "test")
 
   val frameworks =

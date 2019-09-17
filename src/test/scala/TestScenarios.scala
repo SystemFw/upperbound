@@ -1,5 +1,7 @@
 package upperbound
 
+import syntax.backpressure._
+
 import fs2._
 import cats.effect._
 import cats.effect.concurrent.Ref
@@ -7,8 +9,6 @@ import cats.syntax.all._
 
 import scala.collection.immutable.Queue
 import scala.concurrent.duration._
-
-import syntax.backpressure._
 
 object TestScenarios {
   case class TestingConditions(

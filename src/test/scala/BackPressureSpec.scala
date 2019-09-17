@@ -1,10 +1,10 @@
 package upperbound
 
+import syntax.rate._
+
 import cats.effect._
 import fs2.Stream
 import scala.concurrent.duration._
-
-import syntax.rate._
 
 class BackPressureSpec extends BaseSpec {
   val samplingWindow = 5.seconds
