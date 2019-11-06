@@ -52,16 +52,16 @@ def dep(org: String)(version: String)(modules: String*) =
 
 lazy val dependencies =
   libraryDependencies ++= Seq(
-    "co.fs2" %% "fs2-core" % "2.0.0",
+    "co.fs2" %% "fs2-core" % "2.1.0",
     "org.typelevel" %% "cats-core" % "2.0.0",
     "org.typelevel" %% "cats-effect" % "2.0.0",
-    "org.typelevel" %% "cats-collections-core" % "0.8.0"
+    "org.typelevel" %% "cats-collections-core" % "0.9.0"
   )
 
 lazy val tests = {
   val dependencies =
     libraryDependencies ++= Seq(
-      "org.scalacheck" %% "scalacheck" % "1.14.0",
+      "org.scalacheck" %% "scalacheck" % "1.14.2",
       "org.scalatest" %% "scalatest" % "3.0.8",
       "org.typelevel" %% "cats-effect-laws" % "2.0.0"
     ).map(_ % "test")
