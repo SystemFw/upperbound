@@ -19,8 +19,8 @@ class BackPressureSpec extends BaseSpec {
   val backOffConditions = TestingConditions(
     backOff = x => x,
     backPressure = BackPressure.never,
-    desiredRate = 1.every(T.millis),
-    productionRate = 1.every(1.millis),
+    desiredRate = 1 every T.millis,
+    productionRate = 1 every 1.millis,
     producers = 1,
     jobsPerProducer = 100,
     jobCompletion = 25.millis,
