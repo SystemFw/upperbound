@@ -9,7 +9,6 @@ import scala.concurrent.duration._
 import queues.Queue
 
 class QueueSpec extends BaseSpec {
-
   "A Queue should" - {
     "dequeue the highest priority elements first" in forAll { (elems: Vector[Int]) =>
       import DefaultEnv._

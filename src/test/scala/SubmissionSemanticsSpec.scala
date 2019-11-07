@@ -10,9 +10,7 @@ class SubmissionSemanticsSpec extends BaseSpec {
   import DefaultEnv._
 
   "A worker" - {
-
     "when using fire-and-forget semantics should" - {
-
       "continue execution immediately" in {
         def prog =
           for {
@@ -32,7 +30,6 @@ class SubmissionSemanticsSpec extends BaseSpec {
     }
 
     "when using await semantics should" - {
-
       "complete when the result of the submitted job is ready" in {
         def prog =
           for {
@@ -75,5 +72,4 @@ class SubmissionSemanticsSpec extends BaseSpec {
       }
     }
   }
-
 }

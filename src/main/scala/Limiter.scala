@@ -12,7 +12,6 @@ import queues.Queue
   * A purely functional, interval based rate limiter.
   */
 trait Limiter[F[_]] {
-
   /**
     * Returns an `F[Unit]` which represents the action of submitting
     * `job` to the limiter with the given priority. A higher
@@ -52,7 +51,6 @@ trait Limiter[F[_]] {
 }
 
 object Limiter {
-
   /**
     * Signals that the number of jobs waiting to be executed has
     * reached the maximum allowed number. See [[Limiter.start]]
@@ -174,5 +172,4 @@ object Limiter {
         def initial: FiniteDuration = 0.seconds
       }
     }
-
 }

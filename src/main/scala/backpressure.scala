@@ -39,7 +39,6 @@ class BackPressure[F[_], A](job: F[A]) {
     }.rethrow
 }
 object BackPressure {
-
   /**
     * Decides when to signal backpressure given the result or error
     * of a job
@@ -85,5 +84,4 @@ object BackPressure {
     implicit def upperboundSyntaxBackPressure[F[_], A](fa: F[A]): BackPressure[F, A] =
       new BackPressure(fa)
   }
-
 }

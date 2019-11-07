@@ -7,12 +7,10 @@ import fs2._
 import cats.collections.Heap
 
 private[upperbound] object queues {
-
   /**
     * Non-blocking, concurrent, MPSC priority queue.
     */
   trait Queue[F[_], A] {
-
     /**
       * Enqueues an element. A higher number means higher priority,
       * with 0 as the default. Fails if the queue is full.
