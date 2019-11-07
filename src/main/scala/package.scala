@@ -1,10 +1,8 @@
 package object upperbound {
-
   type LimitReachedException = Limiter.LimitReachedException
   val LimitReachedException = Limiter.LimitReachedException
 
   object syntax {
-
     /**
       * Syntactic sugar to create rates.
       *

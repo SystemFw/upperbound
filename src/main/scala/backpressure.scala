@@ -29,9 +29,8 @@ import scala.reflect.ClassTag
 class BackPressure[F[_], A](job: F[A]) {
   def withBackoff(
       backOff: FiniteDuration => FiniteDuration,
-      ack: BackPressure.Ack[A])(
-      implicit ev: MonadError[F, Throwable],
-      limiter: Limiter[F]): F[A] =
+      ack: BackPressure.Ack[A]
+  )(implicit ev: MonadError[F, Throwable], limiter: Limiter[F]): F[A] =
     job.attempt.flatTap { x =>
       if (ack.slowDown(x))
         limiter.interval.modify(i => backOff(i) -> i).void
@@ -40,7 +39,6 @@ class BackPressure[F[_], A](job: F[A]) {
     }.rethrow
 }
 object BackPressure {
-
   /**
     * Decides when to signal backpressure given the result or error
     * of a job
@@ -84,7 +82,7 @@ object BackPressure {
 
   trait Syntax {
     implicit def upperboundSyntaxBackPressure[F[_], A](
-        fa: F[A]): BackPressure[F, A] = new BackPressure(fa)
+        fa: F[A]
+    ): BackPressure[F, A] = new BackPressure(fa)
   }
-
 }
