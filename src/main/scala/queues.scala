@@ -7,12 +7,10 @@ import fs2._
 import cats.collections.Heap
 
 private[upperbound] object queues {
-
   /**
     * Non-blocking, concurrent, MPSC priority queue.
     */
   trait Queue[F[_], A] {
-
     /**
       * Enqueues an element. A higher number means higher priority,
       * with 0 as the default. Fails if the queue is full.
@@ -44,7 +42,8 @@ private[upperbound] object queues {
     type State[F[_], A] = Either[Deferred[F, A], IQueue[A]]
 
     def apply[F[_]: Concurrent, A](
-        maxSize: Int = Int.MaxValue): F[Queue[F, A]] =
+        maxSize: Int = Int.MaxValue
+    ): F[Queue[F, A]] =
       Ref.of[F, State[F, A]](IQueue.empty.asRight).map { state =>
         new Queue[F, A] {
           def enqueue(a: A, priority: Int): F[Unit] =
@@ -54,8 +53,8 @@ private[upperbound] object queues {
                   if (queue.size < maxSize)
                     queue.enqueue(a, priority).asRight -> ().pure[F]
                   else
-                    queue.asRight -> Sync[F].raiseError[Unit](
-                      new LimitReachedException)
+                    queue.asRight -> Sync[F]
+                      .raiseError[Unit](new LimitReachedException)
                 case Left(consumerWaiting) =>
                   IQueue.empty.asRight -> consumerWaiting.complete(a)
               }
@@ -63,19 +62,21 @@ private[upperbound] object queues {
               .uncancelable
 
           def dequeue: F[A] =
-            Deferred[F, A].bracketCase(wait =>
-              state.modify {
-                case Right(queue) =>
-                  queue.dequeue match {
-                    case None => wait.asLeft -> wait.get
-                    case Some((v, tail)) => tail.asRight -> v.pure[F]
-                  }
-                case st @ Left(consumerWaiting) =>
-                  val error =
-                    "Protocol violation: concurrent consumers in a MPSC queue"
-                  st -> Sync[F].raiseError[A](new IllegalStateException(error))
-              }.flatten
-            //
+            Deferred[F, A].bracketCase(
+              wait =>
+                state.modify {
+                  case Right(queue) =>
+                    queue.dequeue match {
+                      case None => wait.asLeft -> wait.get
+                      case Some((v, tail)) => tail.asRight -> v.pure[F]
+                    }
+                  case st @ Left(consumerWaiting) =>
+                    val error =
+                      "Protocol violation: concurrent consumers in a MPSC queue"
+                    st -> Sync[F]
+                      .raiseError[A](new IllegalStateException(error))
+                }.flatten
+              //
             ) {
               case (_, ExitCase.Completed | ExitCase.Error(_)) => ().pure[F]
               case (_, ExitCase.Canceled) =>

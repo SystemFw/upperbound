@@ -27,7 +27,8 @@ object TestScenarios {
       mean: Double,
       stdDeviation: Double,
       overshoot: Double,
-      undershoot: Double)
+      undershoot: Double
+  )
   object Metric {
     def from(samples: Vector[Long]): Metric = {
       def diffs =
