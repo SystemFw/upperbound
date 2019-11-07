@@ -15,9 +15,9 @@ class RateLimitingSpec extends BaseSpec {
       import E._
 
       val conditions = TestingConditions(
-        desiredRate = 1 every 200.millis,
+        desiredRate = 1.every(200.millis),
         backOff = _ => 0.millis,
-        productionRate = 1 every 1.millis,
+        productionRate = 1.every(1.millis),
         producers = 4,
         jobsPerProducer = 100,
         backPressure = BackPressure.never,
@@ -38,9 +38,9 @@ class RateLimitingSpec extends BaseSpec {
       import E._
 
       val conditions = TestingConditions(
-        desiredRate = 1 every 200.millis,
+        desiredRate = 1.every(200.millis),
         backOff = _ => 0.millis,
-        productionRate = 1 every 300.millis,
+        productionRate = 1.every(300.millis),
         producers = 1,
         jobsPerProducer = 100,
         backPressure = BackPressure.never,

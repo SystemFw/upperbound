@@ -11,40 +11,38 @@ import queues.Queue
 class QueueSpec extends BaseSpec {
 
   "A Queue should" - {
-    "dequeue the highest priority elements first" in forAll {
-      (elems: Vector[Int]) =>
-        import DefaultEnv._
+    "dequeue the highest priority elements first" in forAll { (elems: Vector[Int]) =>
+      import DefaultEnv._
 
-        def prog =
-          Queue[IO, Int]()
-            .map { q =>
-              Stream
-                .emits(elems)
-                .zipWithIndex
-                .evalMap { case (e, p) => q.enqueue(e, p.toInt) }
-                .drain ++ q.dequeueAll.take(elems.size)
-            }
-            .flatMap(_.compile.toVector)
+      def prog =
+        Queue[IO, Int]()
+          .map { q =>
+            Stream
+              .emits(elems)
+              .zipWithIndex
+              .evalMap { case (e, p) => q.enqueue(e, p.toInt) }
+              .drain ++ q.dequeueAll.take(elems.size)
+          }
+          .flatMap(_.compile.toVector)
 
-        assert(prog.unsafeRunSync === elems.reverse)
+      assert(prog.unsafeRunSync === elems.reverse)
     }
 
-    "dequeue elements with the same priority in FIFO order" in forAll {
-      (elems: Vector[Int]) =>
-        import DefaultEnv._
+    "dequeue elements with the same priority in FIFO order" in forAll { (elems: Vector[Int]) =>
+      import DefaultEnv._
 
-        def prog =
-          Queue[IO, Int]()
-            .map { q =>
-              Stream
-                .emits(elems)
-                .evalMap(q.enqueue(_))
-                .drain ++ q.dequeueAll
-                .take(elems.size)
-            }
-            .flatMap(_.compile.toVector)
+      def prog =
+        Queue[IO, Int]()
+          .map { q =>
+            Stream
+              .emits(elems)
+              .evalMap(q.enqueue(_))
+              .drain ++ q.dequeueAll
+              .take(elems.size)
+          }
+          .flatMap(_.compile.toVector)
 
-        assert(prog.unsafeRunSync === elems)
+      assert(prog.unsafeRunSync === elems)
     }
 
     "fail an enqueue attempt if the queue is full" in {

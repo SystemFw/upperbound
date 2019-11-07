@@ -27,7 +27,8 @@ object TestScenarios {
       mean: Double,
       stdDeviation: Double,
       overshoot: Double,
-      undershoot: Double)
+      undershoot: Double
+  )
   object Metric {
     def from(samples: Vector[Long]): Metric = {
       def diffs =
@@ -58,7 +59,7 @@ object TestScenarios {
     (vector[F], vector[F]).mapN {
       case (submissionTimes, startTimes) =>
         def record(destination: Ref[F, Vector[Long]]): F[Unit] =
-          Timer[F].clock.monotonic(MILLISECONDS) flatMap { time =>
+          Timer[F].clock.monotonic(MILLISECONDS).flatMap { time =>
             destination.update(times => time +: times)
           }
 
@@ -69,34 +70,32 @@ object TestScenarios {
 
         def concurrentProducers: Pipe[F, Unit, Unit] =
           producer =>
-            Stream(producer zipLeft pulse).repeat
+            Stream(producer.zipLeft(pulse)).repeat
               .take(t.producers)
               .parJoin(t.producers)
 
-        def experiment = Limiter.start[F](t.desiredRate).use {
-          implicit limiter =>
-            def producer: Stream[F, Unit] =
-              Stream
-                .range(0, t.jobsPerProducer)
-                .map(job(_).withBackoff(t.backOff, t.backPressure))
-                .evalMap { x =>
-                  record(submissionTimes) *> limiter
-                    .submit(job = x, priority = 0)
-                }
-
+        def experiment = Limiter.start[F](t.desiredRate).use { implicit limiter =>
+          def producer: Stream[F, Unit] =
             Stream
-              .sleep[F](t.samplingWindow)
-              .concurrently(producer.through(concurrentProducers))
-              .compile
-              .drain
+              .range(0, t.jobsPerProducer)
+              .map(job(_).withBackoff(t.backOff, t.backPressure))
+              .evalMap { x =>
+                record(submissionTimes) *> limiter
+                  .submit(job = x, priority = 0)
+              }
+
+          Stream
+            .sleep[F](t.samplingWindow)
+            .concurrently(producer.through(concurrentProducers))
+            .compile
+            .drain
         }
 
-        def collectResults = (submissionTimes.get, startTimes.get).mapN {
-          (prods, jobs) =>
-            Result(
-              producerMetrics = Metric.from(prods.sorted),
-              jobExecutionMetrics = Metric.from(jobs.sorted)
-            )
+        def collectResults = (submissionTimes.get, startTimes.get).mapN { (prods, jobs) =>
+          Result(
+            producerMetrics = Metric.from(prods.sorted),
+            jobExecutionMetrics = Metric.from(jobs.sorted)
+          )
         }
 
         experiment >> collectResults

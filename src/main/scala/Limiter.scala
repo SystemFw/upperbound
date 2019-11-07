@@ -84,7 +84,7 @@ object Limiter {
       job: F[A],
       priority: Int = 0
   ): F[A] =
-    Deferred[F, Either[Throwable, A]] flatMap { p =>
+    Deferred[F, Either[Throwable, A]].flatMap { p =>
       Limiter[F].submit(
         job.attempt
           .flatTap(p.complete)

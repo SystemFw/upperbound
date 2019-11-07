@@ -17,7 +17,7 @@ class SubmissionSemanticsSpec extends BaseSpec {
         def prog =
           for {
             complete <- Ref.of[IO, Boolean](false)
-            _ <- Limiter.start[IO](1 every 10.seconds).use { limiter =>
+            _ <- Limiter.start[IO](1.every(10.seconds)).use { limiter =>
               // the first is picked up when the limiter starts
               // the other exercises the scenario we care about
               limiter.submit(IO.unit) >> limiter.submit(complete.set(true))
@@ -37,9 +37,8 @@ class SubmissionSemanticsSpec extends BaseSpec {
         def prog =
           for {
             complete <- Ref.of[IO, Boolean](false)
-            res <- Limiter.start[IO](1 every 1.seconds).use {
-              implicit limiter =>
-                Limiter.await(complete.set(true).as("done"))
+            res <- Limiter.start[IO](1.every(1.seconds)).use { implicit limiter =>
+              Limiter.await(complete.set(true).as("done"))
             }
             state <- complete.get
           } yield res -> state
@@ -52,9 +51,8 @@ class SubmissionSemanticsSpec extends BaseSpec {
 
       "report the original error if execution of the submitted job fails" in {
         case class MyError() extends Exception
-        def prog = Limiter.start[IO](1 every 1.seconds).use {
-          implicit limiter =>
-            Limiter.await(IO.raiseError[Int](new MyError))
+        def prog = Limiter.start[IO](1.every(1.seconds)).use { implicit limiter =>
+          Limiter.await(IO.raiseError[Int](new MyError))
         }
 
         assertThrows[MyError](prog.unsafeRunSync)
@@ -65,7 +63,7 @@ class SubmissionSemanticsSpec extends BaseSpec {
       "reject new jobs immediately" in {
         def prog =
           Limiter
-            .start[IO](1 every 10.seconds, n = 1)
+            .start[IO](1.every(10.seconds), n = 1)
             .use { limiter =>
               val task = limiter.submit(IO.unit)
               // the first is picked up when the limiter starts
