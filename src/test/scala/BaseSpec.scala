@@ -3,6 +3,7 @@ package upperbound
 import org.scalatest._
 import cats.effect._, laws.util.TestContext
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import org.scalatest.freespec.AsyncFreeSpec
 
 abstract class BaseSpec
     extends AsyncFreeSpec
