@@ -13,7 +13,7 @@ lazy val commonSettings = Seq(
   organization := "org.systemfw",
   name := "upperbound",
   scalaVersion := "2.12.10",
-  crossScalaVersions := Seq("2.11.12", scalaVersion.value, "2.13.1"),
+  crossScalaVersions := Seq("2.13.5", scalaVersion.value, "2.13.1"),
   scalafmtOnCompile := true
 )
 
