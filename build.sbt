@@ -60,6 +60,23 @@ lazy val tests = {
     "org.scalatestplus" %% "scalacheck-1-15" % "3.2.9.0",
     "org.typelevel" %% "cats-effect-laws" % "3.2.1"
   ).map(_ % "test")
+  val dependencies =
+    libraryDependencies ++= Seq(
+      "org.scalacheck" %% "scalacheck" % "1.15.4",
+      "org.scalatest" %% "scalatest" % "3.2.9",
+      "org.scalatestplus" %% "scalacheck-1-15" % "3.2.9.0",
+      "org.typelevel" %% "cats-effect-laws" % "3.2.1"
+      "org.scalameta" %% "munit" % "0.7.20",
+      "org.scalameta" %% "munit-scalacheck" % "0.7.20",
+      "org.typelevel" %% "munit-cats-effect-2" % "0.12.0",
+      "org.typelevel" %% "scalacheck-effect" % "0.7.0",
+      "org.typelevel" %% "scalacheck-effect-munit" % "0.7.0"
+    ).map(_ % "test")
+
+  val frameworks =
+    testFrameworks := Seq(TestFrameworks.ScalaTest, new TestFramework("munit.Framework"))
+
+  Seq(dependencies, frameworks)
 }
 
 lazy val docs =
