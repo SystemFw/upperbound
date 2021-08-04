@@ -2,8 +2,7 @@ package upperbound
 
 import fs2.Stream
 import cats.effect._
-import cats.syntax.all._
-import cats.instances.vector._
+import cats.syntax.flatMap._
 import scala.concurrent.duration._
 
 import queues.Queue

@@ -54,17 +54,12 @@ lazy val dependencies =
   )
 
 lazy val tests = {
-  val dependencies =
-    libraryDependencies ++= Seq(
-      "org.scalacheck" %% "scalacheck" % "1.14.2",
-      "org.scalatest" %% "scalatest" % "3.0.8",
-      "org.typelevel" %% "cats-effect-laws" % "2.0.0"
-    ).map(_ % "test")
-
-  val frameworks =
-    testFrameworks := Seq(TestFrameworks.ScalaTest)
-
-  Seq(dependencies, frameworks)
+  libraryDependencies ++= Seq(
+    "org.scalacheck" %% "scalacheck" % "1.15.4",
+    "org.scalatest" %% "scalatest" % "3.2.9",
+    "org.scalatestplus" %% "scalacheck-1-15" % "3.2.9.0",
+    "org.typelevel" %% "cats-effect-laws" % "2.5.2"
+  ).map(_ % "test")
 }
 
 lazy val docs =

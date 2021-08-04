@@ -2,7 +2,7 @@ package upperbound
 
 import syntax.rate._
 
-import cats.syntax.all._
+import cats.syntax.flatMap._
 import cats.effect._, concurrent.Ref
 import scala.concurrent.duration._
 
