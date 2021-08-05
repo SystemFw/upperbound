@@ -9,6 +9,9 @@ class RateLimitingSpec extends BaseSpec {
   val samplingWindow = 10.seconds
   import TestScenarios._
 
+  def within(a: Long, b: Long, threshold: Long): Boolean =
+    scala.math.abs(a - b) < threshold
+
   "Limiter" - {
     "multiple fast producers, fast non-failing jobs" in {
       val E = new Env
@@ -25,11 +28,12 @@ class RateLimitingSpec extends BaseSpec {
         samplingWindow = samplingWindow
       )
 
-      val res = mkScenario[IO](conditions).unsafeToFuture
-      env.tick(samplingWindow)
+      val res = mkScenario[IO](conditions).unsafeToFuture()
 
       res.map { r =>
-        assert(r.jobExecutionMetrics.diffs.forall(_ === 200L))
+        assert(
+          r.jobExecutionMetrics.diffs.forall(within(_, 200L, 10L))
+        )
       }
     }
 
@@ -48,11 +52,12 @@ class RateLimitingSpec extends BaseSpec {
         samplingWindow = samplingWindow
       )
 
-      val res = mkScenario[IO](conditions).unsafeToFuture
-      env.tick(samplingWindow)
+      val res = mkScenario[IO](conditions).unsafeToFuture()
 
       res.map { r =>
-        assert(r.jobExecutionMetrics.diffs.forall(_ === 300L))
+        assert(
+          r.jobExecutionMetrics.diffs.forall(within(_, 300L, 10L))
+        )
       }
     }
   }

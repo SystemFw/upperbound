@@ -47,9 +47,9 @@ lazy val typeSystemEnhancements =
 
 lazy val dependencies =
   libraryDependencies ++= Seq(
-    "co.fs2" %% "fs2-core" % "2.5.9",
+    "co.fs2" %% "fs2-core" % "3.0.6",
     "org.typelevel" %% "cats-core" % "2.6.1",
-    "org.typelevel" %% "cats-effect" % "2.5.2",
+    "org.typelevel" %% "cats-effect" % "3.2.1",
     "org.typelevel" %% "cats-collections-core" % "0.9.3"
   )
 
@@ -58,7 +58,7 @@ lazy val tests = {
     "org.scalacheck" %% "scalacheck" % "1.15.4",
     "org.scalatest" %% "scalatest" % "3.2.9",
     "org.scalatestplus" %% "scalacheck-1-15" % "3.2.9.0",
-    "org.typelevel" %% "cats-effect-laws" % "2.5.2"
+    "org.typelevel" %% "cats-effect-laws" % "3.2.1"
   ).map(_ % "test")
 }
 

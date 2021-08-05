@@ -3,7 +3,7 @@ package upperbound
 import syntax.rate._
 
 import cats.syntax.flatMap._
-import cats.effect._, concurrent.Ref
+import cats.effect._
 import scala.concurrent.duration._
 
 class SubmissionSemanticsSpec extends BaseSpec {
@@ -23,7 +23,7 @@ class SubmissionSemanticsSpec extends BaseSpec {
             res <- complete.get
           } yield res
 
-        val res = prog.unsafeRunSync
+        val res = prog.unsafeRunSync()
 
         assert(res === false)
       }
@@ -41,7 +41,7 @@ class SubmissionSemanticsSpec extends BaseSpec {
             state <- complete.get
           } yield res -> state
 
-        val (res, state) = prog.unsafeRunSync
+        val (res, state) = prog.unsafeRunSync()
 
         assert(res === "done")
         assert(state === true)
@@ -54,7 +54,7 @@ class SubmissionSemanticsSpec extends BaseSpec {
             Limiter.await(IO.raiseError[Int](new MyError))
         }
 
-        assertThrows[MyError](prog.unsafeRunSync)
+        assertThrows[MyError](prog.unsafeRunSync())
       }
     }
 
@@ -70,7 +70,7 @@ class SubmissionSemanticsSpec extends BaseSpec {
               task >> task >> task
             }
 
-        assertThrows[LimitReachedException](prog.unsafeRunSync)
+        assertThrows[LimitReachedException](prog.unsafeRunSync())
       }
     }
   }

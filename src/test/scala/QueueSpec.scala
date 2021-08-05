@@ -24,7 +24,7 @@ class QueueSpec extends BaseSpec {
             }
             .flatMap(_.compile.toVector)
 
-        assert(prog.unsafeRunSync === elems.reverse)
+        assert(prog.unsafeRunSync() === elems.reverse)
     }
 
     "dequeue elements with the same priority in FIFO order" in forAll {
@@ -42,7 +42,7 @@ class QueueSpec extends BaseSpec {
             }
             .flatMap(_.compile.toVector)
 
-        assert(prog.unsafeRunSync === elems)
+        assert(prog.unsafeRunSync() === elems)
     }
 
     "fail an enqueue attempt if the queue is full" in {
@@ -55,7 +55,7 @@ class QueueSpec extends BaseSpec {
           _ <- q.enqueue(1)
         } yield ()
 
-      assertThrows[LimitReachedException](prog.unsafeRunSync)
+      assertThrows[LimitReachedException](prog.unsafeRunSync())
     }
 
     "successfully enqueue after dequeueing from a full queue" in {
@@ -71,7 +71,7 @@ class QueueSpec extends BaseSpec {
           r <- q.dequeue
         } yield r
 
-      assert(prog.unsafeRunSync === 3)
+      assert(prog.unsafeRunSync() === 3)
     }
   }
 
@@ -88,8 +88,7 @@ class QueueSpec extends BaseSpec {
           prod.start >> consumer.as(true)
         }
 
-    val res = prog.unsafeToFuture
-    env.tick(3.seconds)
+    val res = prog.unsafeToFuture()
     res.map(r => assert(r))
   }
 
@@ -105,8 +104,7 @@ class QueueSpec extends BaseSpec {
         _ <- q.dequeue.timeout(1.second)
       } yield true
 
-    val res = prog.unsafeToFuture
-    env.tick(3.seconds)
+    val res = prog.unsafeToFuture()
     res.map(r => assert(r))
   }
 }

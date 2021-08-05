@@ -40,8 +40,7 @@ class BackPressureSpec extends BaseSpec {
         backPressure = BackPressure.Ack(_ => true)
       )
 
-      val res = mkScenario[IO](conditions).unsafeToFuture
-      env.tick(samplingWindow)
+      val res = mkScenario[IO](conditions).unsafeToFuture()
 
       res.map { r =>
         val measuredBackOff = r.jobExecutionMetrics.diffs.map(_ / T)
@@ -65,8 +64,7 @@ class BackPressureSpec extends BaseSpec {
         backPressure = BackPressure.Ack(everyOtherJob)
       )
 
-      val res = mkScenario[IO](conditions).unsafeToFuture
-      env.tick(samplingWindow)
+      val res = mkScenario[IO](conditions).unsafeToFuture()
 
       res.map { r =>
         val measuredBackOff = r.jobExecutionMetrics.diffs.map(_ / T)
