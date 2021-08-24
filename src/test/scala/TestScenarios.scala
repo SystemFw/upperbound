@@ -4,7 +4,6 @@ import syntax.backpressure._
 
 import fs2._
 import cats.effect._
-import cats.effect.concurrent.Ref
 import cats.syntax.all._
 
 import scala.collection.immutable.Queue
@@ -35,7 +34,9 @@ object TestScenarios {
         Stream
           .emits(samples)
           .sliding(2)
-          .map { case Queue(x, y) => math.abs(x - y) }
+          .map { chunk =>
+            math.abs(chunk(1) - chunk(0))
+          }
           .toVector
       def mean = diffs.sum.toDouble / diffs.size
       def variance =
@@ -55,16 +56,16 @@ object TestScenarios {
 
   def vector[F[_]: Concurrent] = Ref[F].of(Vector.empty[Long])
 
-  def mkScenario[F[_]: Concurrent: Timer](t: TestingConditions): F[Result] =
+  def mkScenario[F[_]: Concurrent: Temporal](t: TestingConditions): F[Result] =
     (vector[F], vector[F]).mapN {
       case (submissionTimes, startTimes) =>
         def record(destination: Ref[F, Vector[Long]]): F[Unit] =
-          Timer[F].clock.monotonic(MILLISECONDS) flatMap { time =>
-            destination.update(times => time +: times)
+          Clock[F].monotonic flatMap { time =>
+            destination.update(times => time.toMillis +: times)
           }
 
         def job(i: Int) =
-          record(startTimes) >> Timer[F].sleep(t.jobCompletion).as(i)
+          record(startTimes) >> Temporal[F].sleep(t.jobCompletion).as(i)
 
         def pulse = Stream.fixedRate[F](t.productionRate.period)
 

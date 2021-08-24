@@ -53,10 +53,10 @@ private[upperbound] object queues {
                   if (queue.size < maxSize)
                     queue.enqueue(a, priority).asRight -> ().pure[F]
                   else
-                    queue.asRight -> Sync[F]
+                    queue.asRight -> Concurrent[F]
                       .raiseError[Unit](new LimitReachedException)
                 case Left(consumerWaiting) =>
-                  IQueue.empty.asRight -> consumerWaiting.complete(a)
+                  IQueue.empty.asRight -> consumerWaiting.complete(a).void
               }
               .flatten
               .uncancelable
@@ -73,13 +73,13 @@ private[upperbound] object queues {
                   case st @ Left(consumerWaiting) =>
                     val error =
                       "Protocol violation: concurrent consumers in a MPSC queue"
-                    st -> Sync[F]
+                    st -> Concurrent[F]
                       .raiseError[A](new IllegalStateException(error))
                 }.flatten
               //
             ) {
-              case (_, ExitCase.Completed | ExitCase.Error(_)) => ().pure[F]
-              case (_, ExitCase.Canceled) =>
+              case (_, Outcome.Succeeded(_) | Outcome.Errored(_)) => ().pure[F]
+              case (_, Outcome.Canceled()) =>
                 state.update {
                   case s @ Right(_) => s
                   case l @ Left(waiting) => IQueue.empty[A].asRight

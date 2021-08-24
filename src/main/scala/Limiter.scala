@@ -1,7 +1,7 @@
 package upperbound
 
 import cats._, implicits._
-import cats.effect._, concurrent._
+import cats.effect._
 import cats.effect.implicits._
 import fs2._, fs2.concurrent.SignallingRef
 
@@ -105,7 +105,7 @@ object Limiter {
     * number of jobs waiting goes below `n` again.
     * `n` defaults to `Int.MaxValue` if not specified. Must be > 0.
     */
-  def start[F[_]: Concurrent: Timer](
+  def start[F[_]: Concurrent: Temporal](
       maxRate: Rate,
       n: Int = Int.MaxValue
   ): Resource[F, Limiter[F]] = {
@@ -150,7 +150,7 @@ object Limiter {
               .interruptWhen(stop.get.attempt)
 
           executor.compile.drain.start.void
-            .as(limiter -> stop.complete(()))
+            .as(limiter -> stop.complete(()).void)
       }.flatten
     }
   }

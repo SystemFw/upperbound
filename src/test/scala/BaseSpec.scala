@@ -1,8 +1,9 @@
 package upperbound
 
 import org.scalatest._
-import cats.effect._, laws.util.TestContext
+import cats.effect._
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import org.scalatest.freespec.AsyncFreeSpec
 
 abstract class BaseSpec
     extends AsyncFreeSpec
@@ -10,14 +11,12 @@ abstract class BaseSpec
     with OptionValues
     with EitherValues {
   class Env {
-    val env = TestContext()
-    implicit val ctx: ContextShift[IO] = env.contextShift[IO]
-    implicit val timer: Timer[IO] = env.timer[IO]
+    import cats.effect.unsafe.IORuntime
+    implicit val global: IORuntime = IORuntime.global
   }
 
   object DefaultEnv {
-    val defaultEc = scala.concurrent.ExecutionContext.global
-    implicit val Timer: Timer[IO] = IO.timer(defaultEc)
-    implicit val ContextShift: ContextShift[IO] = IO.contextShift(defaultEc)
+    import cats.effect.unsafe.IORuntime
+    implicit val global: IORuntime = IORuntime.global
   }
 }
