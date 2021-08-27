@@ -43,7 +43,7 @@ lazy val compilerOptions = {
 }
 
 lazy val typeSystemEnhancements =
-  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.13.0" cross CrossVersion.full)
+  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.13.1" cross CrossVersion.full)
 
 lazy val dependencies =
   libraryDependencies ++= Seq(
