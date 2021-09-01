@@ -45,7 +45,7 @@ object TestScenarios {
       def overshoot = diffs.max
       def undershoot = diffs.min
 
-      Metric(diffs, mean, std, overshoot, undershoot)
+      Metric(diffs, mean, std, overshoot.toDouble, undershoot.toDouble)
     }
   }
 

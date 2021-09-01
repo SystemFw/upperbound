@@ -57,7 +57,7 @@ class BackPressureSpec extends BaseSpec {
 
       def constantBackOff: FiniteDuration => FiniteDuration = _ => T.millis * 2
       def everyOtherJob: Either[Throwable, Int] => Boolean =
-        _.right.get % 2 == 0
+        _.toOption.get % 2 == 0
 
       val conditions = backOffConditions.copy(
         backOff = constantBackOff,
