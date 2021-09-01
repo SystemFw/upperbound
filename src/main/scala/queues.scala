@@ -62,12 +62,15 @@ private[upperbound] object queues {
               .uncancelable
 
           def dequeue: F[A] =
-            Deferred[F, A].bracketCase(
-              wait =>
+            Concurrent[F].uncancelable { poll =>
+              Deferred[F, A].flatMap { wait =>
                 state.modify {
                   case Right(queue) =>
                     queue.dequeue match {
-                      case None => wait.asLeft -> wait.get
+                      case None =>
+                        wait.asLeft -> poll(wait.get).onCancel(
+                          state.set(IQueue.empty[A].asRight)
+                        )
                       case Some((v, tail)) => tail.asRight -> v.pure[F]
                     }
                   case st @ Left(consumerWaiting) =>
@@ -76,14 +79,7 @@ private[upperbound] object queues {
                     st -> Concurrent[F]
                       .raiseError[A](new IllegalStateException(error))
                 }.flatten
-              //
-            ) {
-              case (_, Outcome.Succeeded(_) | Outcome.Errored(_)) => ().pure[F]
-              case (_, Outcome.Canceled()) =>
-                state.update {
-                  case s @ Right(_) => s
-                  case l @ Left(waiting) => IQueue.empty[A].asRight
-                }
+              }
             }
 
           def size = state.get.map {
