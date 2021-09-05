@@ -27,27 +27,6 @@ class QueueSpec extends BaseSpec {
         assert(prog.unsafeRunSync() === elems.reverse)
     }
 
-    "dequeue elements with the same priority in FIFO order - CE" in forAll {
-      (elems: Vector[Int]) =>
-        import DefaultEnv._
-
-        import cats.effect.std.PQueue
-        import queues.Queue.Rank
-
-        def prog =
-          PQueue
-            .unbounded[IO, Rank[Int]]
-            .map { q =>
-              Stream
-                .emits(elems)
-                .evalMap(e => q.offer(Rank(e, 0)))
-                .drain ++ Stream.repeatEval(q.take).take(elems.size)
-            }
-            .flatMap(_.compile.toVector)
-
-        assert(prog.unsafeRunSync() === elems.map(Rank(_, 0)))
-    }
-
     "dequeue elements with the same priority in FIFO order" in forAll {
       (elems: Vector[Int]) =>
         import DefaultEnv._
