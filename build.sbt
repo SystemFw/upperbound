@@ -58,8 +58,6 @@ lazy val tests = {
   val dependencies =
     libraryDependencies ++= Seq(
       "org.scalacheck" %% "scalacheck" % "1.15.4",
-      "org.scalatest" %% "scalatest" % "3.2.9",
-      "org.scalatestplus" %% "scalacheck-1-15" % "3.2.9.0",
       "org.typelevel" %% "cats-effect-laws" % "3.2.6",
       "org.scalameta" %% "munit" % "0.7.29",
       "org.scalameta" %% "munit-scalacheck" % "0.7.29", // same as above
@@ -69,7 +67,7 @@ lazy val tests = {
     ).map(_ % "test")
 
   val frameworks =
-    testFrameworks := Seq(TestFrameworks.ScalaTest, new TestFramework("munit.Framework"))
+    testFrameworks := Seq(new TestFramework("munit.Framework"))
 
   Seq(dependencies, frameworks)
 }
