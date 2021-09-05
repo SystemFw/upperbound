@@ -95,7 +95,7 @@ object Limiter {
     * number of jobs waiting goes below `n` again.
     * `n` defaults to `Int.MaxValue` if not specified. Must be > 0.
     */
-  def start[F[_]: Concurrent: Temporal](
+  def start[F[_]: Temporal](
       maxRate: Rate,
       n: Int = Int.MaxValue
   ): Resource[F, Limiter[F]] = {
