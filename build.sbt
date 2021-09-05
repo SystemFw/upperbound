@@ -1,3 +1,5 @@
+Global / onChangedBuildSource := ReloadOnSourceChanges
+
 lazy val root = (project in file(".")).settings(
   commonSettings,
   compilerOptions,
@@ -49,8 +51,7 @@ lazy val dependencies =
   libraryDependencies ++= Seq(
     "co.fs2" %% "fs2-core" % "3.0.6",
     "org.typelevel" %% "cats-core" % "2.6.1",
-    "org.typelevel" %% "cats-effect" % "3.2.1",
-    "org.typelevel" %% "cats-collections-core" % "0.9.3"
+    "org.typelevel" %% "cats-effect" % "3.2.7"
   )
 
 lazy val tests = {
