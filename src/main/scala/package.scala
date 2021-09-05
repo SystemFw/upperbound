@@ -15,23 +15,5 @@ package object upperbound {
       * }}}
       */
     object rate extends Rate.Syntax
-
-    /**
-      * Syntactic sugar to apply backpressure combinators.
-      * Example:
-      * {{{
-      * import upperbound._
-      * import upperbound.syntax.backpressure._
-      * import scala.concurrent.duration._
-      *
-      * def ex[F[_]: Limiter](job: F[Int]): F[Unit] =
-      *   Limiter[F].submit { job.withBackoff(_ + 1.second, Ack.onAllErrors)
-      *
-      * }}}
-      *
-      * See [[BackPressure]]
-      *
-      */
-    object backpressure extends BackPressure.Syntax
   }
 }

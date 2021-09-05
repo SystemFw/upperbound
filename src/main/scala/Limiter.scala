@@ -33,16 +33,6 @@ trait Limiter[F[_]] {
   def submit[A](job: F[A], priority: Int = 0): F[Unit]
 
   /**
-    * Allows to sample, change or react to changes to the current interval between two tasks.
-    */
-  def interval: SignallingRef[F, FiniteDuration]
-
-  /**
-    * The interval set on creation of this [[Limiter]]
-    */
-  def initial: FiniteDuration
-
-  /**
     * Obtains a snapshot of the current number of jobs waiting to be
     * executed. May be out of date the instant after it is
     * retrieved.
@@ -126,10 +116,6 @@ object Limiter {
               )
 
             def pending: F[Int] = queue.size
-
-            def interval: SignallingRef[F, FiniteDuration] = interval_
-
-            def initial: FiniteDuration = maxRate.period
           }
 
           // `job` needs to be executed asynchronously so that long
@@ -138,14 +124,9 @@ object Limiter {
           // cause the overall processing to fail
           def exec(job: F[Unit]): F[Unit] = job.start.void
 
-          def rate: Stream[F, Unit] =
-            Stream
-              .repeatEval(limiter.interval.get)
-              .flatMap(Stream.sleep[F])
-
           def executor: Stream[F, Unit] =
             queue.dequeueAll
-              .zipLeft(rate)
+              .zipLeft(Stream.fixedDelay(maxRate.period))
               .evalMap(exec)
               .interruptWhen(stop.get.attempt)
 
@@ -164,12 +145,7 @@ object Limiter {
     SignallingRef[F, FiniteDuration](0.seconds).map { interval_ =>
       new Limiter[F] {
         def submit[A](job: F[A], priority: Int): F[Unit] = job.void
-
         def pending: F[Int] = 0.pure[F]
-
-        def interval: SignallingRef[F, FiniteDuration] = interval_
-
-        def initial: FiniteDuration = 0.seconds
       }
     }
 }

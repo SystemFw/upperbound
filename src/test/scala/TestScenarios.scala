@@ -1,7 +1,5 @@
 package upperbound
 
-import syntax.backpressure._
-
 import fs2._
 import cats.effect._
 import cats.syntax.all._
@@ -17,7 +15,6 @@ object TestScenarios {
       producers: Int,
       jobsPerProducer: Int,
       jobCompletion: FiniteDuration,
-      backPressure: BackPressure.Ack[Int],
       samplingWindow: FiniteDuration
   )
 
@@ -80,7 +77,7 @@ object TestScenarios {
             def producer: Stream[F, Unit] =
               Stream
                 .range(0, t.jobsPerProducer)
-                .map(job(_).withBackoff(t.backOff, t.backPressure))
+                .map(job(_))
                 .evalMap { x =>
                   record(submissionTimes) *> limiter
                     .submit(job = x, priority = 0)
