@@ -1,3 +1,5 @@
+Global / onChangedBuildSource := ReloadOnSourceChanges
+
 lazy val root = (project in file(".")).settings(
   commonSettings,
   compilerOptions,
@@ -49,27 +51,21 @@ lazy val dependencies =
   libraryDependencies ++= Seq(
     "co.fs2" %% "fs2-core" % "3.0.6",
     "org.typelevel" %% "cats-core" % "2.6.1",
-    "org.typelevel" %% "cats-effect" % "3.2.1"
+    "org.typelevel" %% "cats-effect" % "3.2.6"
   )
 
 lazy val tests = {
-  libraryDependencies ++= Seq(
-    "org.scalacheck" %% "scalacheck" % "1.15.4",
-    "org.scalatest" %% "scalatest" % "3.2.9",
-    "org.scalatestplus" %% "scalacheck-1-15" % "3.2.9.0",
-    "org.typelevel" %% "cats-effect-laws" % "3.2.1"
-  ).map(_ % "test")
   val dependencies =
     libraryDependencies ++= Seq(
       "org.scalacheck" %% "scalacheck" % "1.15.4",
       "org.scalatest" %% "scalatest" % "3.2.9",
       "org.scalatestplus" %% "scalacheck-1-15" % "3.2.9.0",
-      "org.typelevel" %% "cats-effect-laws" % "3.2.1",
-      "org.scalameta" %% "munit" % "0.7.20",
-      "org.scalameta" %% "munit-scalacheck" % "0.7.20",
-      "org.typelevel" %% "munit-cats-effect-2" % "0.12.0",
-      "org.typelevel" %% "scalacheck-effect" % "0.7.0",
-      "org.typelevel" %% "scalacheck-effect-munit" % "0.7.0"
+      "org.typelevel" %% "cats-effect-laws" % "3.2.6",
+      "org.scalameta" %% "munit" % "0.7.29",
+      "org.scalameta" %% "munit-scalacheck" % "0.7.29", // same as above
+      "org.typelevel" %% "munit-cats-effect-3" % "1.0.5",
+      "org.typelevel" %% "scalacheck-effect" % "1.0.2",
+      "org.typelevel" %% "scalacheck-effect-munit" % "1.0.2" // same as above
     ).map(_ % "test")
 
   val frameworks =
