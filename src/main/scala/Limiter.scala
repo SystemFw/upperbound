@@ -6,7 +6,7 @@ import cats.effect.implicits._
 import fs2._, fs2.concurrent.SignallingRef
 
 import scala.concurrent.duration._
-import queues.Queue
+import upperbound.Queue
 
 /**
   * A purely functional, interval based rate limiter.

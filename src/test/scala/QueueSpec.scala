@@ -5,7 +5,7 @@ import cats.effect._
 import cats.syntax.flatMap._
 import scala.concurrent.duration._
 
-import queues.Queue
+import upperbound.Queue
 
 class QueueSpec extends BaseSpec {
   "A Queue should" - {
