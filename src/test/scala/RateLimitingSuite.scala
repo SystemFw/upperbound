@@ -12,6 +12,30 @@ class RateLimitingSuite extends BaseSuite {
   def within(a: Long, b: Long, threshold: Long): Boolean =
     scala.math.abs(a - b) < threshold
 
+  test("await semantics should return the result of the submitted job") {
+    IO.ref(false)
+      .flatMap { complete =>
+        Limiter.start[IO](1 every 1.seconds).use {
+          _.await(complete.set(true).as("done")).product(complete.get)
+        }
+      }
+      .map {
+        case (res, state) =>
+          assertEquals(res, "done")
+          assertEquals(state, true)
+      }
+  }
+
+  test("await semantics should report errors of a failed task") {
+    case class MyError() extends Exception
+    Limiter
+      .start[IO](1 every 1.seconds)
+      .use {
+        _.await(IO.raiseError[Int](new MyError))
+      }
+      .intercept[MyError]
+  }
+
   test("multiple fast producers, fast non-failing jobs") {
     val conditions = TestingConditions(
       desiredRate = 1 every 200.millis,

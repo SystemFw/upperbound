@@ -13,24 +13,28 @@ import upperbound.Queue
   */
 trait Limiter[F[_]] {
   /**
-    * Returns an `F[Unit]` which represents the action of submitting
-    * `job` to the limiter with the given priority. A higher
-    * number means a higher priority. The default is 0.
+    * Returns an `F[A]` which represents the action of submitting
+    * `fa` to the [[Limiter]] with the given priority, and waiting for
+    * its result. A higher number means a higher priority. The
+    * default is 0.
     *
-    * The semantics of `submit` are fire-and-forget: the returned
-    * `F[Unit]` immediately returns, without waiting for the `F[A]`
-    * to complete its execution. Note that this means that the
-    * returned `F[Unit]` will be successful regardless of whether
-    * `job` fails or not.
+    * The semantics of `await` are blocking: the returned `F[A]`
+    * only completes when `job` has finished its execution,
+    * returning the result of `job` or failing with the same error
+    * `job` failed with. However, the blocking is only semantic, no
+    * actual threads are blocked by the implementation.
     *
     * This method is designed to be called concurrently: every
     * concurrent call submits a job, and they are all started at a
     * rate which is no higher then the maximum rate you specify when
-    * constructing a [[Limiter]]. Higher priority jobs take precedence
-    * over lower priority ones.
-    *
+    * constructing a [[Limiter]].
+    * Higher priority jobs take precedence over lower priority ones.
     */
-  def submit[A](job: F[A], priority: Int = 0): F[Unit]
+  // TODO implement cancelation
+  def await[A](
+      job: F[A],
+      priority: Int = 0
+  ): F[A]
 
   /**
     * Obtains a snapshot of the current number of jobs waiting to be
@@ -68,18 +72,6 @@ object Limiter {
     * constructing a [[Limiter]].
     */
   // TODO do I want to allow cancelation here?
-  def await[F[_]: Concurrent: Limiter, A](
-      job: F[A],
-      priority: Int = 0
-  ): F[A] =
-    Deferred[F, Either[Throwable, A]] flatMap { p =>
-      Limiter[F].submit(
-        job.attempt
-          .flatTap(p.complete)
-          .rethrow, // TODO does it make sense to rethrow here?
-        priority
-      ) *> p.get.rethrow
-    }
 
   /**
     * Creates a new [[Limiter]] and starts processing the jobs
@@ -109,11 +101,18 @@ object Limiter {
       ).mapN {
         case (queue, stop, interval_) =>
           def limiter = new Limiter[F] {
-            def submit[A](job: F[A], priority: Int): F[Unit] =
-              queue.enqueue(
-                job.void,
-                priority
-              )
+            def await[A](
+                job: F[A],
+                priority: Int = 0
+            ): F[A] =
+              Deferred[F, Either[Throwable, A]] flatMap { p =>
+                queue.enqueue(
+                  job.attempt
+                    .flatTap(p.complete)
+                    .void,
+                  priority
+                ) *> p.get.rethrow
+              }
 
             def pending: F[Int] = queue.size
           }
@@ -144,7 +143,7 @@ object Limiter {
   def noOp[F[_]: Concurrent]: F[Limiter[F]] =
     SignallingRef[F, FiniteDuration](0.seconds).map { interval_ =>
       new Limiter[F] {
-        def submit[A](job: F[A], priority: Int): F[Unit] = job.void
+        def await[A](job: F[A], priority: Int): F[A] = job
         def pending: F[Int] = 0.pure[F]
       }
     }

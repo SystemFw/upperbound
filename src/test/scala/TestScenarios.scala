@@ -3,6 +3,7 @@ package upperbound
 import fs2._
 import cats.effect._
 import cats.syntax.all._
+import cats.effect.syntax.all._
 
 import scala.collection.immutable.Queue
 import scala.concurrent.duration._
@@ -80,7 +81,9 @@ object TestScenarios {
                 .map(job(_))
                 .evalMap { x =>
                   record(submissionTimes) *> limiter
-                    .submit(job = x, priority = 0)
+                    .await(job = x, priority = 0)
+                    .start
+                    .void
                 }
 
             Stream
