@@ -56,7 +56,7 @@ object TestScenarios {
 
   def vector[F[_]: Concurrent] = Ref[F].of(Vector.empty[Long])
 
-  def mkScenario[F[_]: Concurrent: Temporal](t: TestingConditions): F[Result] =
+  def mkScenario[F[_]: Temporal](t: TestingConditions): F[Result] =
     (vector[F], vector[F]).mapN {
       case (submissionTimes, startTimes) =>
         def record(destination: Ref[F, Vector[Long]]): F[Unit] =
