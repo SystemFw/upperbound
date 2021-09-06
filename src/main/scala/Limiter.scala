@@ -1,5 +1,6 @@
 package upperbound
 
+// TODO syntax.all and sort
 import cats._, implicits._
 import cats.effect._
 import cats.effect.implicits._
