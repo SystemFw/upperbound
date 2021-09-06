@@ -5,7 +5,8 @@ import cats.effect._
 import cats.syntax.flatMap._
 import scala.concurrent.duration._
 
-import upperbound.Queue
+import upperbound.internal.Queue
+
 import org.scalacheck.effect.PropF.forAllF
 
 class QueueSuite extends BaseSuite {

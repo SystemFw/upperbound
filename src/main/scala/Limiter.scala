@@ -6,7 +6,7 @@ import cats.effect.implicits._
 import fs2._, fs2.concurrent.SignallingRef
 
 import scala.concurrent.duration._
-import upperbound.Queue
+import upperbound.internal.Queue
 
 /**
   * A purely functional, interval based rate limiter.
@@ -55,25 +55,6 @@ object Limiter {
   def apply[F[_]](implicit l: Limiter[F]): Limiter[F] = l
 
   /**
-    * Returns an `F[A]` which represents the action of submitting
-    * `fa` to the [[Limiter]] with the given priority, and waiting for
-    * its result. A higher number means a higher priority. The
-    * default is 0.
-    *
-    * The semantics of `await` are blocking: the returned `F[A]`
-    * only completes when `job` has finished its execution,
-    * returning the result of `job` or failing with the same error
-    * `job` failed with. However, the blocking is only semantic, no
-    * actual threads are blocked by the implementation.
-    *
-    * This method is designed to be called concurrently: every
-    * concurrent call submits a job, and they are all started at a
-    * rate which is no higher then the maximum rate you specify when
-    * constructing a [[Limiter]].
-    */
-  // TODO do I want to allow cancelation here?
-
-  /**
     * Creates a new [[Limiter]] and starts processing the jobs
     * submitted so it, which are started at a rate no higher
     * than `maxRate`.
@@ -88,18 +69,19 @@ object Limiter {
     * `n` defaults to `Int.MaxValue` if not specified. Must be > 0.
     */
   def start[F[_]: Temporal](
-      maxRate: Rate,
-      n: Int = Int.MaxValue
+      minInterval: FiniteDuration,
+      maxQueued: Int = Int.MaxValue,
+      maxConcurrent: Int = Int.MaxValue
   ): Resource[F, Limiter[F]] = {
-    assert(n > 0, s"n must be > 0, was $n")
+    assert(maxQueued > 0, s"n must be > 0, was $maxQueued")
+    assert(maxConcurrent > 0, s"n must be > 0, was $maxConcurrent")
 
     Resource {
       (
-        Queue[F, F[Unit]](n),
-        Deferred[F, Unit],
-        SignallingRef[F, FiniteDuration](maxRate.period)
+        Queue[F, F[Unit]](maxQueued),
+        Deferred[F, Unit]
       ).mapN {
-        case (queue, stop, interval_) =>
+        case (queue, stop) =>
           def limiter = new Limiter[F] {
             def await[A](
                 job: F[A],
@@ -125,10 +107,11 @@ object Limiter {
 
           def executor: Stream[F, Unit] =
             queue.dequeueAll
-              .zipLeft(Stream.fixedDelay(maxRate.period))
+              .zipLeft(Stream.fixedDelay(minInterval))
               .evalMap(exec)
               .interruptWhen(stop.get.attempt)
 
+          // TODO use concurrently.compile.resource
           executor.compile.drain.start.void
             .as(limiter -> stop.complete(()).void)
       }.flatten

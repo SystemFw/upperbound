@@ -10,9 +10,8 @@ import scala.concurrent.duration._
 
 object TestScenarios {
   case class TestingConditions(
-      desiredRate: Rate,
-      backOff: FiniteDuration => FiniteDuration,
-      productionRate: Rate,
+      desiredInterval: FiniteDuration,
+      productionInterval: FiniteDuration,
       producers: Int,
       jobsPerProducer: Int,
       jobCompletion: FiniteDuration,
@@ -65,7 +64,7 @@ object TestScenarios {
         def job(i: Int) =
           record(startTimes) >> Temporal[F].sleep(t.jobCompletion).as(i)
 
-        def pulse = Stream.fixedRate[F](t.productionRate.period)
+        def pulse = Stream.fixedRate[F](t.productionInterval)
 
         def concurrentProducers: Pipe[F, Unit, Unit] =
           producer =>
@@ -73,7 +72,7 @@ object TestScenarios {
               .take(t.producers)
               .parJoin(t.producers)
 
-        def experiment = Limiter.start[F](t.desiredRate).use {
+        def experiment = Limiter.start[F](t.desiredInterval).use {
           implicit limiter =>
             def producer: Stream[F, Unit] =
               Stream

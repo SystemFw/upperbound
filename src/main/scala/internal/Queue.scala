@@ -1,4 +1,5 @@
 package upperbound
+package internal
 
 import cats._
 import cats.syntax.all._

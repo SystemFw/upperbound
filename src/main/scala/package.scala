@@ -14,6 +14,6 @@ package object upperbound {
       * val r = 100 every 1.minute
       * }}}
       */
-    object rate extends Rate.Syntax
+    object rate extends internal.RateSyntax
   }
 }

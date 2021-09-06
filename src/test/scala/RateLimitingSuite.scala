@@ -38,9 +38,8 @@ class RateLimitingSuite extends BaseSuite {
 
   test("multiple fast producers, fast non-failing jobs") {
     val conditions = TestingConditions(
-      desiredRate = 1 every 200.millis,
-      backOff = _ => 0.millis,
-      productionRate = 1 every 1.millis,
+      desiredInterval = 1 every 200.millis,
+      productionInterval = 1 every 1.millis,
       producers = 4,
       jobsPerProducer = 100,
       jobCompletion = 0.seconds,
@@ -54,9 +53,8 @@ class RateLimitingSuite extends BaseSuite {
 
   test("slow producer, no unnecessary delays") {
     val conditions = TestingConditions(
-      desiredRate = 1 every 200.millis,
-      backOff = _ => 0.millis,
-      productionRate = 1 every 300.millis,
+      desiredInterval = 1 every 200.millis,
+      productionInterval = 1 every 300.millis,
       producers = 1,
       jobsPerProducer = 100,
       jobCompletion = 0.seconds,
