@@ -21,6 +21,7 @@ private[upperbound] case class Task[F[_]: Concurrent, A](
     result: Deferred[F, Outcome[F, Throwable, A]],
     stopSignal: Deferred[F, Unit]
 ) {
+  private val F = Concurrent[F]
   // ok other issue here: if this gets canceled before `task` runs, `result`
   // will not be set to canceled (guaranteeCase doesn't run), so if we then wait
   // on result in waitResult's onCancel logic, we will deadlock, we can probably
@@ -38,12 +39,28 @@ private[upperbound] case class Task[F[_]: Concurrent, A](
       .redeem(_ => (), _ => ())
       .race {
         stopSignal.get >>
-        // this handles the corner case where `task` was canceled before its
-        // finaliser was installed, to make sure `result` is always complete.
-        // If `task` has already populated `result`, this becomes a no-op
-        result.complete(Outcome.canceled).void
+          // this handles the corner case where `task` was canceled before its
+          // finaliser was installed, to make sure `result` is always complete.
+          // If `task` has already populated `result`, this becomes a no-op
+          result.complete(Outcome.canceled).void
       }
       .void
+
+  // this might be easier to reason about than the state space of the previous version
+  // especially as I add potential checking for cancelationRequested
+  def executable2: F[Unit] =
+    F.uncancelable { _ =>
+      // `task` and `get` are started on different fibers:
+      // we don't need to `poll` them if we want to cancel them from here
+      F.racePair(task, stopSignal.get)
+        .flatMap {
+          case Left((taskResult, waitForStopSignal)) =>
+            waitForStopSignal.cancel >> result.complete(taskResult)
+          case Right((runningTask, _)) =>
+            runningTask.cancel >> runningTask.join.flatMap(result.complete(_))
+        }
+        .void
+    }
 
   def cancelationRequested: F[Boolean] =
     stopSignal.tryGet.map(_.isDefined)
@@ -68,7 +85,7 @@ private[upperbound] case class Task[F[_]: Concurrent, A](
     result.get
       .onCancel(stopSignal.complete(()).void)
       .flatMap {
-        _.embed(onCancel = Spawn[F].canceled >> Spawn[F].never)
+        _.embed(onCancel = F.canceled >> F.never)
       }
 }
 
