@@ -54,8 +54,8 @@ private[upperbound] object Queue {
   def apply[F[_]: Concurrent, A](
       maxSize: Int = Int.MaxValue
   ): F[Queue[F, A]] =
-    Ref[F].of(0L).product(PQueue.bounded[F, Rank[F, A]](maxSize)).map {
-      case (lastInsertedAt, q) =>
+    (Ref[F].of(0L), PQueue.bounded[F, Rank[F, A]](maxSize)).mapN {
+      (lastInsertedAt, q) =>
         new Queue[F, A] {
           type Id = F[Boolean]
 

@@ -7,8 +7,9 @@ import cats.effect.implicits._
 import fs2._, fs2.concurrent.SignallingRef
 
 import scala.concurrent.duration._
-import upperbound.internal.Queue
+import upperbound.internal.{Queue, Task}
 
+// TODO new scaladoc
 /**
   * A purely functional, interval based rate limiter.
   */
@@ -31,7 +32,6 @@ trait Limiter[F[_]] {
     * constructing a [[Limiter]].
     * Higher priority jobs take precedence over lower priority ones.
     */
-  // TODO implement cancelation
   def await[A](
       job: F[A],
       priority: Int = 0
@@ -116,6 +116,54 @@ object Limiter {
           executor.compile.drain.start.void
             .as(limiter -> stop.complete(()).void)
       }.flatten
+    }
+  }
+
+  def start2[F[_]: Temporal](
+      minInterval: FiniteDuration,
+      maxQueued: Int = Int.MaxValue,
+      maxConcurrent: Int = Int.MaxValue
+  ): Resource[F, Limiter[F]] = {
+    assert(maxQueued > 0, s"n must be > 0, was $maxQueued")
+    assert(maxConcurrent > 0, s"n must be > 0, was $maxConcurrent")
+
+    Resource.eval(Queue[F, F[Unit]](maxQueued)).flatMap { queue =>
+      val limiter = new Limiter[F] {
+        def await[A](
+            job: F[A],
+            priority: Int = 0
+        ): F[A] =
+          Task.create(job).flatMap { task =>
+            queue
+              .enqueue(task.executable, priority)
+              .flatMap { id =>
+                val propagateCancelation =
+                  queue.delete(id).flatMap { deleted =>
+                    // task has already been dequeued and running
+                    task.cancel.whenA(!deleted)
+                  }
+
+                task.awaitResult.onCancel(propagateCancelation)
+              }
+          }
+
+        def pending: F[Int] = queue.size
+      }
+
+      // we want a fixed delay rather than fixed rate, so that when
+      // waking up after waiting for `maxConcurrent` to lower, there are
+      // no bursts
+      val executor: Stream[F, Unit] =
+        queue.dequeueAll
+          .zipLeft(Stream.fixedDelay(minInterval))
+          .mapAsyncUnordered(maxConcurrent)(task => task)
+
+      Stream
+        .emit(limiter)
+        .concurrently(executor)
+        .compile
+        .resource
+        .lastOrError
     }
   }
 

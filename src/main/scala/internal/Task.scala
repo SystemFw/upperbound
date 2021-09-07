@@ -53,7 +53,7 @@ private[upperbound] case class Task[F[_]: Concurrent, A](
     * However, canceling `waitResult` does not cancel `executable`
     * automatically, `cancel` needs to be called manually.
     */
-  def waitResult: F[A] =
+  def awaitResult: F[A] =
     result.get
       .flatMap {
         _.embed(onCancel = F.canceled >> F.never)
