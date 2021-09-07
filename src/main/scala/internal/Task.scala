@@ -31,7 +31,7 @@ private[upperbound] case class Task[F[_]: Concurrent, A](
       // `racePair(..).flatMap` propagates cancelation triggered by
       // `cancel`from the client to `executable`.
       poll(F.racePair(task, stopSignal.get))
-        .onCancel(result.complete(Outcome.canceled))
+        .onCancel(result.complete(Outcome.canceled).void)
         .flatMap {
           case Left((taskResult, waitForStopSignal)) =>
             waitForStopSignal.cancel >> result.complete(taskResult)
@@ -58,4 +58,12 @@ private[upperbound] case class Task[F[_]: Concurrent, A](
       .flatMap {
         _.embed(onCancel = F.canceled >> F.never)
       }
+}
+
+private[upperbound] object Task {
+  def create[F[_]: Concurrent, A](fa: F[A]): F[Task[F, A]] =
+    (
+      Deferred[F, Outcome[F, Throwable, A]],
+      Deferred[F, Unit]
+    ).mapN(Task(fa, _, _))
 }
