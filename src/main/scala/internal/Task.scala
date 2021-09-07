@@ -21,15 +21,17 @@ private[upperbound] case class Task[F[_]: Concurrent, A](
   /**
     * Packages `task` for later execution.
     * Cannot fail.
-    * Propagates result to `waitResult`.
+    * Propagates result to `waitResult`, including cancelation.
     */
   def executable: F[Unit] =
-    F.uncancelable { _ =>
-      // `task` and `get` are started on different fibers:
-      // we don't need to `poll` them if we want to cancel them from here
+    F.uncancelable { poll =>
+      // `poll(..).onCancel` handles direct cancelation of `executable`,
+      // which happens when Limiter itself gets shutdown.
       //
-      // TODO should we `poll`? in case Limiter itself gets interrupted
-      F.racePair(task, stopSignal.get)
+      // `racePair(..).flatMap` propagates cancelation triggered by
+      // `cancel`from the client to `executable`.
+      poll(F.racePair(task, stopSignal.get))
+        .onCancel(result.complete(Outcome.canceled))
         .flatMap {
           case Left((taskResult, waitForStopSignal)) =>
             waitForStopSignal.cancel >> result.complete(taskResult)
