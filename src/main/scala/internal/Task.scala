@@ -137,7 +137,7 @@ private[upperbound] case class Task2[F[_]: Concurrent, A](
     * Propagates result to `waitResult`.
     * Cancels itself if `waitResult` is canceled.
     */
-  def makeExecutable(task: F[A]): F[Unit] =
+  private def makeExecutable(task: F[A]): F[Unit] =
     F.uncancelable { _ =>
       // `task` and `get` are started on different fibers:
       // we don't need to `poll` them if we want to cancel them from here
@@ -151,14 +151,17 @@ private[upperbound] case class Task2[F[_]: Concurrent, A](
         .void
     }
 
+  /**
+    * Cancels the running task, backpressuring on finalisers
+    */
+  private def cancelRunningTask: F[Unit] =
+    stopSignal.complete(()) >> result.get.void
+
   def getExecutable: F[Option[F[Unit]]] =
     task.getAndSet(None).map {
       case None => Option.empty
       case Some(task) => Some(makeExecutable(task))
     }
-
-  def cancelationRequested: F[Boolean] =
-    stopSignal.tryGet.map(_.isDefined)
 
   /**
     * Completes when `task` does.
@@ -170,10 +173,8 @@ private[upperbound] case class Task2[F[_]: Concurrent, A](
     result.get
       .onCancel {
         task.getAndSet(None).flatMap {
-          case Some(task) => F.unit // task removed, do nothing
-          case None =>
-            stopSignal
-              .complete(()) >> result.get.void // cancels and waits on finalisation
+          case Some(taskIsQueued) => F.unit
+          case None => cancelRunningTask
         }
       }
       .flatMap {
