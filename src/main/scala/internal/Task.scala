@@ -118,3 +118,74 @@ private[upperbound] object Task {
       Deferred[F, Unit]
     ).mapN(Task(fa, _, _))
 }
+
+/**
+  * Packages `fa` to be queued for later execution,
+  * and controls propagation of the result from executor to client,
+  * and propagation of cancelation from client to executor.
+  */
+private[upperbound] case class Task2[F[_]: Concurrent, A](
+    task: Ref[F, Option[F[A]]],
+    result: Deferred[F, Outcome[F, Throwable, A]],
+    stopSignal: Deferred[F, Unit]
+) {
+  private val F = Concurrent[F]
+
+  /**
+    * Packages `task` for later execution.
+    * Cannot fail.
+    * Propagates result to `waitResult`.
+    * Cancels itself if `waitResult` is canceled.
+    */
+  def makeExecutable(task: F[A]): F[Unit] =
+    F.uncancelable { _ =>
+      // `task` and `get` are started on different fibers:
+      // we don't need to `poll` them if we want to cancel them from here
+      F.racePair(task, stopSignal.get)
+        .flatMap {
+          case Left((taskResult, waitForStopSignal)) =>
+            waitForStopSignal.cancel >> result.complete(taskResult)
+          case Right((runningTask, _)) =>
+            runningTask.cancel >> runningTask.join.flatMap(result.complete(_))
+        }
+        .void
+    }
+
+  def getExecutable: F[Option[F[Unit]]] =
+    task.getAndSet(None).map {
+      case None => Option.empty
+      case Some(task) => Some(makeExecutable(task))
+    }
+
+  def cancelationRequested: F[Boolean] =
+    stopSignal.tryGet.map(_.isDefined)
+
+  /**
+    * Completes when `task` does.
+    * Canceling `waitResult` cancels `task`, (respecting
+    * cancelation backpressure? see question above)
+    * Cancels itself if `task` gets canceled externally. (is this absolutely necessary? generally not supported)
+    */
+  def waitResult: F[A] =
+    result.get
+      .onCancel {
+        task.getAndSet(None).flatMap {
+          case Some(task) => F.unit // task removed, do nothing
+          case None =>
+            stopSignal
+              .complete(()) >> result.get.void // cancels and waits on finalisation
+        }
+      }
+      .flatMap {
+        _.embed(onCancel = F.canceled >> F.never)
+      }
+}
+
+private[upperbound] object Task2 {
+  def create[F[_]: Concurrent, A](fa: F[A]): F[Task2[F, A]] =
+    (
+      Ref[F].of(fa.some),
+      Deferred[F, Outcome[F, Throwable, A]],
+      Deferred[F, Unit]
+    ).mapN(Task2(_, _, _))
+}
