@@ -6,6 +6,30 @@ import fs2._
 import cats.syntax.all._
 import cats.effect.syntax.all._
 
+// TODO should I separate this functionality:
+// have the Queue support deletion of elements:
+// enqueue: F[Id]
+// delete: F[Boolean] // was there
+// dequeue // automatically filters deleted shit
+// since I need a Map of things as well, might restore
+// the old implementation altogether and expand it
+// instead of having 3 refs.
+// On second thoughts, perhaps having 2 Ref (map + lastInserted)
+// plus a ce PQueue is not that big of a deal
+//
+// and task expose cancel that backpressures
+//
+// then in Limiter:
+// task.waitResult.get.onCancel {
+//   deleteFromQueue and if not there task.cancel
+// }
+//
+// Pros:
+// - interruption logic in limiter is clear
+// - Task gets nice and self contained: a queueable task
+// - Limiter doesn't need to implement logic to skip a pause on deleted elem,
+//   queue abstracts that away
+
 // This will be used if I follow the implementation strategy
 // of enqueing tasks directly, and having Limiter's background stream
 // execute them.
