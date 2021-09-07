@@ -75,6 +75,28 @@ private[upperbound] case class Task[F[_]: Concurrent, A](
   // Maybe `executable` should set a flag, which will indicate it's been dequeued and about to execute:
   // mapAsync will make sure that it can never be dequeued if there is no space to run.
   // need to do a race condition analysis though.
+  // assume executable returns F[Option[F[Unit]]], by checking cancelationRequested and then setting
+  // executionStarted
+  // Possible race:
+  // executable checks cancelationRequested and it's false, but before
+  // it can set executionStarted to true, waitResult checks
+  // executionStarted and find false, and therefore it won't wait for
+  // cancelation. However the task will be ~immediately canceled since
+  // racePair makes cancelationRequested.get win.So this potentially
+  // works, although it's not easy to reason about
+  // there is a tiny tiny race in that before `get` wins a finaliser for `task` might be installed
+  // which we would not backpressure against.
+  //
+  // Tbh, it's probably easier if `executable` doesn't check for cancelationRequested,
+  // and only sets executionStarted. `racePair` will do the cancelation check.
+  // cancelationRequested will then remain a concern of the dequeuer, which only uses it
+  // to avoid wasting a time slot. If the task gets dequeued, then it will execute immediately
+  // and we can wait on `result` with no issues, because parJoinUnbounded only pulls a new task if there is space (unlike executing it with a naked semaphore), however this splits correctness between the two classes, instead of handling it all here, which isn't great.
+  //
+  // what if executable set executionStarted before checking cancelationRequested? might solve the
+  // remaining problems, but I guess its correctness still depends on the fact that after calling
+  // executable we expect no other delay (or rather we are ok waiting for that delay)
+
   /**
     * Completes when `task` does.
     * Canceling `waitResult` cancels `task`, (respecting
