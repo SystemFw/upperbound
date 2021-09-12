@@ -5,6 +5,8 @@ import scala.concurrent.duration._
 
 import upperbound.syntax.rate._
 
+import cats.effect.testkit.TestControl
+
 class RateLimitingSuite extends BaseSuite {
   val samplingWindow = 10.seconds
   import TestScenarios._
@@ -61,8 +63,10 @@ class RateLimitingSuite extends BaseSuite {
       samplingWindow = samplingWindow
     )
 
-    mkScenario[IO](conditions).map { r =>
-      assert(r.jobExecutionMetrics.diffs.forall(within(_, 300L, 10L)))
+    TestControl.executeFully(mkScenario[IO](conditions)).map { r =>
+      assert(
+        r.get.right.get.jobExecutionMetrics.diffs.forall(within(_, 300, 10L))
+      )
     }
   }
 }
