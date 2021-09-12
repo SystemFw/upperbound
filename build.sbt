@@ -1,5 +1,7 @@
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
+ThisBuild / Test / parallelExecution := false
+
 lazy val root = (project in file(".")).settings(
   commonSettings,
   compilerOptions,

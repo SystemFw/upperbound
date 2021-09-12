@@ -11,13 +11,10 @@ class RateLimitingSuite extends BaseSuite {
   val samplingWindow = 10.seconds
   import TestScenarios._
 
-  def within(a: Long, b: Long, threshold: Long): Boolean =
-    scala.math.abs(a - b) < threshold
-
   test("await semantics should return the result of the submitted job") {
     IO.ref(false)
       .flatMap { complete =>
-        Limiter.start[IO](1 every 1.seconds).use {
+        Limiter.start[IO](200.millis).use {
           _.await(complete.set(true).as("done")).product(complete.get)
         }
       }
@@ -31,7 +28,7 @@ class RateLimitingSuite extends BaseSuite {
   test("await semantics should report errors of a failed task") {
     case class MyError() extends Exception
     Limiter
-      .start[IO](1 every 1.seconds)
+      .start[IO](200.millis)
       .use {
         _.await(IO.raiseError[Int](new MyError))
       }
@@ -40,23 +37,24 @@ class RateLimitingSuite extends BaseSuite {
 
   test("multiple fast producers, fast non-failing jobs") {
     val conditions = TestingConditions(
-      desiredInterval = 1 every 200.millis,
-      productionInterval = 1 every 1.millis,
+      desiredInterval = 200.millis,
+      productionInterval = 1.millis,
       producers = 4,
       jobsPerProducer = 100,
       jobCompletion = 0.seconds,
       samplingWindow = samplingWindow
     )
 
-    mkScenario[IO](conditions).map { r =>
-      assert(r.jobExecutionMetrics.diffs.forall(within(_, 200L, 10L)))
+    TestControl.executeFully(mkScenario[IO](conditions)).map { r =>
+      // adjust once final details of the TestControl api are finalised
+      assert(r.get.toOption.get.jobExecutionMetrics.diffs.forall(_ == 200L))
     }
   }
 
   test("slow producer, no unnecessary delays") {
     val conditions = TestingConditions(
-      desiredInterval = 1 every 200.millis,
-      productionInterval = 1 every 300.millis,
+      desiredInterval = 200.millis,
+      productionInterval = 300.millis,
       producers = 1,
       jobsPerProducer = 100,
       jobCompletion = 0.seconds,
@@ -64,8 +62,9 @@ class RateLimitingSuite extends BaseSuite {
     )
 
     TestControl.executeFully(mkScenario[IO](conditions)).map { r =>
+      // adjust once final details of the TestControl api are finalised
       assert(
-        r.get.right.get.jobExecutionMetrics.diffs.forall(within(_, 300, 10L))
+        r.get.toOption.get.jobExecutionMetrics.diffs.forall(_ == 300L)
       )
     }
   }

@@ -8,6 +8,7 @@ import scala.concurrent.duration._
 import upperbound.internal.Queue
 
 import org.scalacheck.effect.PropF.forAllF
+import cats.effect.testkit.TestControl
 
 class QueueSuite extends BaseSuite {
   test("dequeue the highest priority elements first") {
@@ -61,22 +62,26 @@ class QueueSuite extends BaseSuite {
   }
 
   test("block on an empty queue until an element is available") {
-    Queue[IO, Unit]()
-      .flatMap { q =>
-        def prod = IO.sleep(1.second) >> q.enqueue(())
-        def consumer = q.dequeue.timeout(3.seconds)
+    TestControl.executeFully {
+      Queue[IO, Unit]()
+        .flatMap { q =>
+          def prod = IO.sleep(1.second) >> q.enqueue(())
+          def consumer = q.dequeue.timeout(3.seconds)
 
-        prod.start >> consumer
-      }
+          prod.start >> consumer
+        }
+    }.void
   }
 
   test(
     "If a dequeue gets canceled before an enqueue, no elements are lost in the next dequeue"
   ) {
-    Queue[IO, Unit]().flatMap { q =>
-      q.dequeue.timeout(2.second).attempt >>
-        q.enqueue(()) >>
-        q.dequeue.timeout(1.second)
-    }
+    TestControl.executeFully {
+      Queue[IO, Unit]().flatMap { q =>
+        q.dequeue.timeout(2.second).attempt >>
+          q.enqueue(()) >>
+          q.dequeue.timeout(1.second)
+      }
+    }.void
   }
 }
