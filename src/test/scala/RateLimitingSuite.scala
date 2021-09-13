@@ -45,9 +45,9 @@ class RateLimitingSuite extends BaseSuite {
       samplingWindow = samplingWindow
     )
 
-    TestControl.executeFully(mkScenario[IO](conditions)).map { r =>
+    TestControl.executeEmbed(mkScenario[IO](conditions)).map { r =>
       // adjust once final details of the TestControl api are finalised
-      assert(r.get.toOption.get.jobExecutionMetrics.diffs.forall(_ == 200L))
+      assert(r.get.jobExecutionMetrics.diffs.forall(_ == 200L))
     }
   }
 
@@ -61,10 +61,10 @@ class RateLimitingSuite extends BaseSuite {
       samplingWindow = samplingWindow
     )
 
-    TestControl.executeFully(mkScenario[IO](conditions)).map { r =>
+    TestControl.executeEmbed(mkScenario[IO](conditions)).map { r =>
       // adjust once final details of the TestControl api are finalised
       assert(
-        r.get.toOption.get.jobExecutionMetrics.diffs.forall(_ == 300L)
+        r.get.jobExecutionMetrics.diffs.forall(_ == 300L)
       )
     }
   }

@@ -62,7 +62,7 @@ class QueueSuite extends BaseSuite {
   }
 
   test("block on an empty queue until an element is available") {
-    TestControl.executeFully {
+    TestControl.executeEmbed {
       Queue[IO, Unit]()
         .flatMap { q =>
           def prod = IO.sleep(1.second) >> q.enqueue(())
@@ -76,12 +76,12 @@ class QueueSuite extends BaseSuite {
   test(
     "If a dequeue gets canceled before an enqueue, no elements are lost in the next dequeue"
   ) {
-    TestControl.executeFully {
+    TestControl.executeEmbed {
       Queue[IO, Unit]().flatMap { q =>
         q.dequeue.timeout(2.second).attempt >>
           q.enqueue(()) >>
           q.dequeue.timeout(1.second)
       }
-    }.void
+    }
   }
 }
