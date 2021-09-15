@@ -2,7 +2,7 @@ package upperbound
 
 import fs2.Stream
 import cats.effect._
-import cats.syntax.flatMap._
+import cats.syntax.all._
 import scala.concurrent.duration._
 
 import upperbound.internal.Queue
@@ -84,4 +84,22 @@ class QueueSuite extends BaseSuite {
       }
     }
   }
+
+  test("Mark an element as deleted") {
+    TestControl
+      .executeEmbed {
+        Queue[IO, Int]().flatMap { q =>
+          q.enqueue(1).flatMap { id =>
+            q.enqueue(2) >>
+              q.delete(id) >>
+              (
+                q.dequeue,
+                q.dequeue.map(_.some).timeoutTo(1.second, None.pure[IO])
+              ).tupled
+          }
+        }
+      }
+      .assertEquals(Some((2, None)))
+  }
+  // check that is never the case that delete returns true but the element gets dequeued?
 }
