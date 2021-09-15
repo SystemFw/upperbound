@@ -77,56 +77,6 @@ object Limiter {
     assert(maxQueued > 0, s"n must be > 0, was $maxQueued")
     assert(maxConcurrent > 0, s"n must be > 0, was $maxConcurrent")
 
-    Resource {
-      (
-        Queue[F, F[Unit]](maxQueued),
-        Deferred[F, Unit]
-      ).mapN {
-        case (queue, stop) =>
-          def limiter = new Limiter[F] {
-            def await[A](
-                job: F[A],
-                priority: Int = 0
-            ): F[A] =
-              Deferred[F, Either[Throwable, A]] flatMap { p =>
-                queue.enqueue(
-                  job.attempt
-                    .flatTap(p.complete)
-                    .void,
-                  priority
-                ) *> p.get.rethrow
-              }
-
-            def pending: F[Int] = queue.size
-          }
-
-          // `job` needs to be executed asynchronously so that long
-          // running jobs don't interfere with the frequency of pulling
-          // from the queue. It also means that a failed `job` doesn't
-          // cause the overall processing to fail
-          def exec(job: F[Unit]): F[Unit] = job.start.void
-
-          def executor: Stream[F, Unit] =
-            queue.dequeueAll
-              .zipLeft(Stream.fixedDelay(minInterval))
-              .evalMap(exec)
-              .interruptWhen(stop.get.attempt)
-
-          // TODO use concurrently.compile.resource
-          executor.compile.drain.start.void
-            .as(limiter -> stop.complete(()).void)
-      }.flatten
-    }
-  }
-
-  def start2[F[_]: Temporal](
-      minInterval: FiniteDuration,
-      maxQueued: Int = Int.MaxValue,
-      maxConcurrent: Int = Int.MaxValue
-  ): Resource[F, Limiter[F]] = {
-    assert(maxQueued > 0, s"n must be > 0, was $maxQueued")
-    assert(maxConcurrent > 0, s"n must be > 0, was $maxConcurrent")
-
     Resource.eval(Queue[F, F[Unit]](maxQueued)).flatMap { queue =>
       val limiter = new Limiter[F] {
         def await[A](
