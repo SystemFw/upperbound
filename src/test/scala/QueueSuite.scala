@@ -99,7 +99,7 @@ class QueueSuite extends BaseSuite {
           }
         }
       }
-      .assertEquals(Some((2, None)))
+      .assertEquals(2 -> None)
   }
   // check that is never the case that delete returns true but the element gets dequeued?
 }

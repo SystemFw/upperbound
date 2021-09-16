@@ -53,15 +53,15 @@ lazy val dependencies =
   libraryDependencies ++= Seq(
     "co.fs2" %% "fs2-core" % "3.0.6",
     "org.typelevel" %% "cats-core" % "2.6.1",
-    "org.typelevel" %% "cats-effect" % "3.3-161-09d830c"
+    "org.typelevel" %% "cats-effect" % "3.3-162-2022ef9"
   )
 
 lazy val tests = {
   val dependencies =
     libraryDependencies ++= Seq(
       "org.scalacheck" %% "scalacheck" % "1.15.4",
-      "org.typelevel" %% "cats-effect-laws" % "3.3-161-09d830c",
-      "org.typelevel" %% "cats-effect-testkit" % "3.3-161-09d830c",
+      "org.typelevel" %% "cats-effect-laws" % "3.3-162-2022ef9",
+      "org.typelevel" %% "cats-effect-testkit" % "3.3-162-2022ef9",
       "org.scalameta" %% "munit" % "0.7.29",
       "org.scalameta" %% "munit-scalacheck" % "0.7.29", // same as above
       "org.typelevel" %% "munit-cats-effect-3" % "1.0.5",
