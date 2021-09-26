@@ -117,6 +117,14 @@ and publish it to a keyserver
 
 > gpg --keyserver http://keyserver.ubuntu.com:11371/ --send-key yourKeyId
 
+Finally, go in docs/index.html and, if necessary, change:
+
+- title
+- description
+- name
+- repo
+
+to match your project.
 
 ## Links
 
