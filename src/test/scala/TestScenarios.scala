@@ -26,7 +26,6 @@ import cats.effect._
 import cats.syntax.all._
 import cats.effect.syntax.all._
 
-import scala.collection.immutable.Queue
 import scala.concurrent.duration._
 
 object TestScenarios {

@@ -25,7 +25,6 @@ package internal
 import cats._
 import cats.syntax.all._
 import cats.effect._
-import cats.effect.syntax.all._
 import fs2._
 
 import cats.effect.std.PQueue

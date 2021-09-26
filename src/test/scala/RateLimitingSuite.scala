@@ -24,8 +24,6 @@ package upperbound
 import cats.effect._
 import scala.concurrent.duration._
 
-import upperbound.syntax.rate._
-
 import cats.effect.testkit.TestControl
 
 class RateLimitingSuite extends BaseSuite {

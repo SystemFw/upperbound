@@ -21,13 +21,12 @@
 
 package upperbound
 
-// TODO syntax.all and sort
-import cats._, implicits._
+import cats._, syntax.all._
 import cats.effect._
-import cats.effect.implicits._
-import fs2._, fs2.concurrent.SignallingRef
-
+import cats.effect.syntax.all._
+import fs2._
 import scala.concurrent.duration._
+
 import upperbound.internal.{Queue, Task}
 
 // TODO new scaladoc
@@ -139,11 +138,9 @@ object Limiter {
     * `submit` method. `pending` is always zero.
     * `interval` is set to zero and changes to it have no effect.
     */
-  def noOp[F[_]: Concurrent]: F[Limiter[F]] =
-    SignallingRef[F, FiniteDuration](0.seconds).map { interval_ =>
-      new Limiter[F] {
-        def await[A](job: F[A], priority: Int): F[A] = job
-        def pending: F[Int] = 0.pure[F]
-      }
+  def noOp[F[_]: Applicative]: Limiter[F] =
+    new Limiter[F] {
+      def await[A](job: F[A], priority: Int): F[A] = job
+      def pending: F[Int] = 0.pure[F]
     }
 }

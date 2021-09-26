@@ -23,7 +23,6 @@ package upperbound
 package internal
 
 import cats.effect._
-import fs2._
 import cats.syntax.all._
 import cats.effect.syntax.all._
 
