@@ -38,9 +38,13 @@ def dep(org: String, prefix: String, version: String)(modules: String*)(testModu
   modules.map(m => org %% (prefix ++ m) % version) ++
    testModules.map(m => org %% (prefix ++ m) % version % Test)
 
-lazy val core = project
+lazy val root = project
   .in(file("."))
   .enablePlugins(NoPublishPlugin, SonatypeCiReleasePlugin)
+  .aggregate(core)
+
+lazy val core = project
+  .in(file("modules/core"))
   .settings(
     name := "upperbound",
     scalafmtOnCompile := true,
