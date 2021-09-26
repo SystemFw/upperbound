@@ -6,8 +6,7 @@ import fs2._
 import cats.syntax.all._
 import cats.effect.syntax.all._
 
-/**
-  * Packages `fa` to be queued for later execution,
+/** Packages `fa` to be queued for later execution,
   * and controls propagation of the result from executor to client,
   * and propagation of cancelation from client to executor.
   */
@@ -18,8 +17,7 @@ private[upperbound] case class Task[F[_]: Concurrent, A](
 ) {
   private val F = Concurrent[F]
 
-  /**
-    * Packages `task` for later execution.
+  /** Packages `task` for later execution.
     * Cannot fail.
     * Propagates result to `waitResult`, including cancelation.
     */
@@ -41,14 +39,12 @@ private[upperbound] case class Task[F[_]: Concurrent, A](
         .void
     }
 
-  /**
-    * Cancels the running task, backpressuring on finalisers
+  /** Cancels the running task, backpressuring on finalisers
     */
   def cancel: F[Unit] =
     (stopSignal.complete(()) >> result.get.void).uncancelable
 
-  /**
-    * Completes when `executable` does, canceling itself if
+  /** Completes when `executable` does, canceling itself if
     * `executable` gets canceled.
     * However, canceling `waitResult` does not cancel `executable`
     * automatically, `cancel` needs to be called manually.

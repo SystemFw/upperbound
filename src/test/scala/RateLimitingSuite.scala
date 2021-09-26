@@ -18,10 +18,9 @@ class RateLimitingSuite extends BaseSuite {
           _.await(complete.set(true).as("done")).product(complete.get)
         }
       }
-      .map {
-        case (res, state) =>
-          assertEquals(res, "done")
-          assertEquals(state, true)
+      .map { case (res, state) =>
+        assertEquals(res, "done")
+        assertEquals(state, true)
       }
   }
 

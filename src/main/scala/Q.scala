@@ -8,18 +8,16 @@ object Q {
   def p = {
     IO.sleep(1.second) >> IO.println("first")
   }.raceOutcome {
-      IO.sleep(3.seconds) >> IO.println("Can't stop me now")
-    }
-    .unsafeRunSync()
+    IO.sleep(3.seconds) >> IO.println("Can't stop me now")
+  }.unsafeRunSync()
 
   def p2 = {
     IO.sleep(1.second) >> IO.println("first") <* IO.raiseError(
       new Exception("boom")
     )
   }.raceOutcome {
-      IO.sleep(3.seconds) >> IO.println("Can't stop me now")
-    }
-    .unsafeRunSync()
+    IO.sleep(3.seconds) >> IO.println("Can't stop me now")
+  }.unsafeRunSync()
 
   def p3 =
     (IO.sleep(3.seconds) >> IO.println("hello")).start

@@ -10,12 +10,11 @@ import scala.concurrent.duration._
 import upperbound.internal.{Queue, Task}
 
 // TODO new scaladoc
-/**
-  * A purely functional, interval based rate limiter.
+/** A purely functional, interval based rate limiter.
   */
 trait Limiter[F[_]] {
-  /**
-    * Returns an `F[A]` which represents the action of submitting
+
+  /** Returns an `F[A]` which represents the action of submitting
     * `fa` to the [[Limiter]] with the given priority, and waiting for
     * its result. A higher number means a higher priority. The
     * default is 0.
@@ -37,8 +36,7 @@ trait Limiter[F[_]] {
       priority: Int = 0
   ): F[A]
 
-  /**
-    * Obtains a snapshot of the current number of jobs waiting to be
+  /** Obtains a snapshot of the current number of jobs waiting to be
     * executed. May be out of date the instant after it is
     * retrieved.
     */
@@ -46,8 +44,8 @@ trait Limiter[F[_]] {
 }
 
 object Limiter {
-  /**
-    * Signals that the number of jobs waiting to be executed has
+
+  /** Signals that the number of jobs waiting to be executed has
     * reached the maximum allowed number. See [[Limiter.start]]
     */
   case class LimitReachedException() extends Exception
@@ -55,8 +53,7 @@ object Limiter {
   /** Summoner */
   def apply[F[_]](implicit l: Limiter[F]): Limiter[F] = l
 
-  /**
-    * Creates a new [[Limiter]] and starts processing the jobs
+  /** Creates a new [[Limiter]] and starts processing the jobs
     * submitted so it, which are started at a rate no higher
     * than `maxRate`.
     *
@@ -117,8 +114,7 @@ object Limiter {
     }
   }
 
-  /**
-    * Creates a no-op [[Limiter]], with no rate limiting and a synchronous
+  /** Creates a no-op [[Limiter]], with no rate limiting and a synchronous
     * `submit` method. `pending` is always zero.
     * `interval` is set to zero and changes to it have no effect.
     */

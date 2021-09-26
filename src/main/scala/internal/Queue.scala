@@ -12,21 +12,18 @@ import cats.effect.std.PQueue
 private[upperbound] trait Queue[F[_], A] {
   type Id
 
-  /**
-    * Enqueues an element. A higher number means higher priority,
+  /** Enqueues an element. A higher number means higher priority,
     * with 0 as the default. Fails if the queue is full.
     * Returns an Id that can be used to mark the element as deleted.
     */
   def enqueue(a: A, priority: Int = 0): F[Id]
 
-  /**
-    * Marks the element at this Id as deleted.
+  /** Marks the element at this Id as deleted.
     * Returns false if the element was not in the queue.
     */
   def delete(id: Id): F[Boolean]
 
-  /**
-    * Dequeues the highest priority element. In case there
+  /** Dequeues the highest priority element. In case there
     * are multiple elements with the same priority, they are
     * dequeued in FIFO order.
     * Semantically blocks if the queue is empty.
@@ -37,14 +34,12 @@ private[upperbound] trait Queue[F[_], A] {
     */
   def dequeue: F[A]
 
-  /**
-    * Repeatedly calls `dequeue`
+  /** Repeatedly calls `dequeue`
     */
   def dequeueAll: Stream[F, A] =
     Stream.repeatEval(dequeue)
 
-  /**
-    * Obtains a snapshot of the current number of elements in the
+  /** Obtains a snapshot of the current number of elements in the
     * queue. May be out of date the instant after it is retrieved.
     */
   def size: F[Int]

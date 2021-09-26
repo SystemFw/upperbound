@@ -3,8 +3,8 @@ package object upperbound {
   val LimitReachedException = Limiter.LimitReachedException
 
   object syntax {
-    /**
-      * Syntactic sugar to create rates.
+
+    /** Syntactic sugar to create rates.
       *
       * Example (note the underscores):
       * {{{
