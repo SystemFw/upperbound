@@ -22,7 +22,6 @@
 object Q {
   import cats.effect._
   import scala.concurrent.duration._
-  import cats.effect.syntax.all._
   import cats.syntax.all._
   import cats.effect.unsafe.implicits.global
 

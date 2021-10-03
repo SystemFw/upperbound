@@ -40,7 +40,7 @@ class QueueSuite extends BaseSuite {
             .emits(elems)
             .zipWithIndex
             .evalMap { case (e, p) => q.enqueue(e, p.toInt) }
-            .drain ++ q.dequeueAll.take(elems.size)
+            .drain ++ q.dequeueAll.take(elems.size.toLong)
         }
         .flatMap(_.compile.toVector)
         .assertEquals(elems.reverse)
@@ -55,7 +55,7 @@ class QueueSuite extends BaseSuite {
             .emits(elems)
             .evalMap(q.enqueue(_))
             .drain ++ q.dequeueAll
-            .take(elems.size)
+            .take(elems.size.toLong)
         }
         .flatMap(_.compile.toVector)
         .assertEquals(elems)

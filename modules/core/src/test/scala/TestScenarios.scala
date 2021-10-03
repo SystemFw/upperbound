@@ -88,7 +88,7 @@ object TestScenarios {
       def concurrentProducers: Pipe[F, Unit, Unit] =
         producer =>
           Stream(producer zipLeft pulse).repeat
-            .take(t.producers)
+            .take(t.producers.toLong)
             .parJoin(t.producers)
 
       def experiment =
