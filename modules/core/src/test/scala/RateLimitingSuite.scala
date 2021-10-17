@@ -30,11 +30,11 @@ class RateLimitingSuite extends BaseSuite {
   val samplingWindow = 10.seconds
   import TestScenarios._
 
-  test("await semantics should return the result of the submitted job") {
+  test("submit semantics should return the result of the submitted job") {
     IO.ref(false)
       .flatMap { complete =>
         Limiter.start[IO](200.millis).use {
-          _.await(complete.set(true).as("done")).product(complete.get)
+          _.submit(complete.set(true).as("done")).product(complete.get)
         }
       }
       .map { case (res, state) =>
@@ -43,12 +43,12 @@ class RateLimitingSuite extends BaseSuite {
       }
   }
 
-  test("await semantics should report errors of a failed task") {
+  test("submit semantics should report errors of a failed task") {
     case class MyError() extends Exception
     Limiter
       .start[IO](200.millis)
       .use {
-        _.await(IO.raiseError[Int](new MyError))
+        _.submit(IO.raiseError[Int](new MyError))
       }
       .intercept[MyError]
   }

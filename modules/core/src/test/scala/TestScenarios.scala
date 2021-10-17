@@ -99,7 +99,7 @@ object TestScenarios {
               .map(job(_))
               .evalMap { x =>
                 record(submissionTimes) *> limiter
-                  .await(job = x, priority = 0)
+                  .submit(job = x, priority = 0)
                   .start
                   .void
               }

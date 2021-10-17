@@ -34,10 +34,9 @@ import upperbound.internal.{Queue, Task}
   */
 trait Limiter[F[_]] {
 
-  /**
-    * Submits `job` to the [[Limiter]] and waits until a result is available.
+  /** Submits `job` to the [[Limiter]] and waits until a result is available.
     *
-    * `await` is designed to be called concurrently: every call submits a
+    * `submit` is designed to be called concurrently: every call submits a
     * job, and they are started at regular intervals up to a maximum
     * number of concurrent jobs, based on the parameters you specify when
     * creating the [[Limiter]].
@@ -58,14 +57,15 @@ trait Limiter[F[_]] {
     * next job will only be executed after the required time interval has
     * elapsed.
     *
-    * `await` allows to submit jobs at different priorities, so that
-    * higher priority jobs can be executed before lower priority ones. A
-    * higher number means a higher priority. The default is 0.
+    * The `priority` parameter allows you to submit jobs at different
+    * priorities, so that higher priority jobs can be executed before
+    * lower priority ones.
+    * A higher number means a higher priority. The default is 0.
     *
     * Note that any blocking performed by this method is only semantic, no
     * actual threads are blocked by the implementation.
     */
-  def await[A](
+  def submit[A](
       job: F[A],
       priority: Int = 0
   ): F[A]
@@ -87,8 +87,7 @@ object Limiter {
   /** Summoner */
   def apply[F[_]](implicit l: Limiter[F]): Limiter[F] = l
 
-  /**
-    * Creates a new [[Limiter]] and starts processing submitted jobs at a
+  /** Creates a new [[Limiter]] and starts processing submitted jobs at a
     * regular rate, in priority order.
     *
     * In order to avoid bursts, jobs submitted to the [[Limiter]] are
@@ -136,7 +135,7 @@ object Limiter {
     * `Resource` once, and passing the resulting [[Limiter]] as an
     * argument whenever needed.
     * When the `Resource` is finalised, all pending and running jobs are
-    * canceled. All outstanding calls to `await` are also canceled.
+    * canceled. All outstanding calls to `submit` also canceled.
     */
   def start[F[_]: Temporal](
       minInterval: FiniteDuration,
@@ -148,7 +147,7 @@ object Limiter {
 
     Resource.eval(Queue[F, F[Unit]](maxQueued)).flatMap { queue =>
       val limiter = new Limiter[F] {
-        def await[A](
+        def submit[A](
             job: F[A],
             priority: Int = 0
         ): F[A] =
@@ -192,7 +191,7 @@ object Limiter {
     */
   def noOp[F[_]: Applicative]: Limiter[F] =
     new Limiter[F] {
-      def await[A](job: F[A], priority: Int): F[A] = job
+      def submit[A](job: F[A], priority: Int): F[A] = job
       def pending: F[Int] = 0.pure[F]
     }
 }
