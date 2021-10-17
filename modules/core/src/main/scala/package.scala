@@ -32,7 +32,7 @@ package object upperbound {
       * import upperbound.syntax.rate._
       * import scala.concurrent.duration._
       *
-      * val r = 100 every 1.minute
+      * val r: FiniteDuration = 100 every 1.minute
       * }}}
       */
     object rate extends internal.RateSyntax

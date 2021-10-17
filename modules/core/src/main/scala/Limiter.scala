@@ -30,27 +30,40 @@ import scala.concurrent.duration._
 
 import upperbound.internal.{Queue, Task}
 
-// TODO new scaladoc
 /** A purely functional, interval based rate limiter.
   */
 trait Limiter[F[_]] {
 
-  /** Returns an `F[A]` which represents the action of submitting
-    * `fa` to the [[Limiter]] with the given priority, and waiting for
-    * its result. A higher number means a higher priority. The
-    * default is 0.
+  /**
+    * Submits `job` to the [[Limiter]] and waits until a result is available.
     *
-    * The semantics of `await` are blocking: the returned `F[A]`
-    * only completes when `job` has finished its execution,
-    * returning the result of `job` or failing with the same error
-    * `job` failed with. However, the blocking is only semantic, no
+    * `await` is designed to be called concurrently: every call submits a
+    * job, and they are started at regular intervals up to a maximum
+    * number of concurrent jobs, based on the parameters you specify when
+    * creating the [[Limiter]].
+    *
+    * In case of failure, the returned `F[A]` will fail with the same
+    * error `job` failed with.
+    * It can also fail with a [[LimitReachedException]] if the number of
+    * enqueued jobs is past the limit you specify when creating the
+    * [[Limiter]].
+    *
+    * Cancelation semantics are respected, and cancelling the returned
+    * `F[A]` will also cancel the execution of `job`.
+    * Two scenarios are possible: if cancelation is triggered whilst `job`
+    * is still queued up for execution, `job` will never be executed and the
+    * rate of the [[Limiter]] won't be affected.
+    * If instead cancelation is triggered while `job` is running, `job`
+    * will be interrupted, but that slot will be considered used and the
+    * next job will only be executed after the required time interval has
+    * elapsed.
+    *
+    * `await` allows to submit jobs at different priorities, so that
+    * higher priority jobs can be executed before lower priority ones. A
+    * higher number means a higher priority. The default is 0.
+    *
+    * Note that any blocking performed by this method is only semantic, no
     * actual threads are blocked by the implementation.
-    *
-    * This method is designed to be called concurrently: every
-    * concurrent call submits a job, and they are all started at a
-    * rate which is no higher then the maximum rate you specify when
-    * constructing a [[Limiter]].
-    * Higher priority jobs take precedence over lower priority ones.
     */
   def await[A](
       job: F[A],
