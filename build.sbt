@@ -1,117 +1,107 @@
-lazy val root = (project in file(".")).settings(
-  commonSettings,
-  compilerOptions,
-  consoleSettings,
-  typeSystemEnhancements,
-  dependencies,
-  tests,
-  docs,
-  publishSettings
-)
+Global / onChangedBuildSource := ReloadOnSourceChanges
 
-lazy val commonSettings = Seq(
-  organization := "org.systemfw",
-  name := "upperbound",
-  scalaVersion := "2.13.6",
-  crossScalaVersions := Seq("2.12.15", scalaVersion.value),
-  scalafmtOnCompile := true
+ThisBuild / baseVersion := "0.4.0"
+ThisBuild / organization := "org.systemfw"
+ThisBuild / publishGithubUser := "SystemFw"
+ThisBuild / publishFullName := "Fabio Labella"
+ThisBuild / homepage := Some(url("https://github.com/SystemFw/upperbound"))
+ThisBuild / scmInfo := Some(
+  ScmInfo(
+    url("https://github.com/SystemFw/upperbound"),
+    "git@github.com:SystemFw/upperbound.git"
+  )
 )
+ThisBuild / licenses := List(("MIT", url("http://opensource.org/licenses/MIT")))
+ThisBuild / startYear := Some(2017)
+Global / excludeLintKeys += scmInfo
 
-lazy val consoleSettings = Seq(
-  initialCommands := s"import upperbound._",
-  scalacOptions in (Compile, console) -= "-Ywarn-unused-import"
-)
+val Scala213 = "2.13.6"
+ThisBuild / spiewakMainBranches := Seq("main")
 
-lazy val compilerOptions = {
-  val commonOptions = Seq(
-    "-unchecked",
-    "-deprecation",
-    "-encoding",
-    "utf8",
-    "-target:jvm-1.8",
-    "-feature",
-    "-language:implicitConversions",
-    "-language:higherKinds",
-    "-language:existentials",
-    "-Ywarn-value-discard"
+ThisBuild / crossScalaVersions := Seq(Scala213, "3.0.0", "2.12.14")
+ThisBuild / versionIntroduced := Map("3.0.0" -> "0.4.0")
+ThisBuild / scalaVersion := (ThisBuild / crossScalaVersions).value.head
+Global / excludeLintKeys += versionIntroduced
+ThisBuild / initialCommands := """
+  |import cats._, data._, syntax.all._
+  |import cats.effect._, concurrent._
+  |import cats.effect.implicits._
+  |import cats.effect.unsafe.implicits.global
+  |import fs2._
+  |import fs2.concurrent._
+  |import scala.concurrent.duration._
+  |import upperbound._
+""".stripMargin
+
+ThisBuild / testFrameworks += new TestFramework("munit.Framework")
+
+def dep(org: String, prefix: String, version: String)(modules: String*)(testModules: String*) =
+  modules.map(m => org %% (prefix ++ m) % version) ++
+   testModules.map(m => org %% (prefix ++ m) % version % Test)
+
+lazy val root = project
+  .in(file("."))
+  .enablePlugins(NoPublishPlugin, SonatypeCiReleasePlugin)
+  .aggregate(core)
+
+lazy val core = project
+  .in(file("modules/core"))
+  .settings(
+    name := "upperbound",
+    scalafmtOnCompile := true,
+    libraryDependencies ++=
+      dep("org.typelevel", "cats-", "2.6.1")("core")() ++
+      dep("org.typelevel", "cats-effect", "3.3-162-2022ef9")("")("-laws", "-testkit") ++
+      dep("co.fs2", "fs2-", "3.1.3")("core")() ++
+      dep("org.scalameta", "munit", "0.7.29")()("", "-scalacheck") ++
+      dep("org.typelevel", "", "1.0.5")()("munit-cats-effect-3") ++
+      dep("org.typelevel",  "scalacheck-effect", "1.0.2")()("", "-munit")
   )
 
-  scalacOptions ++= commonOptions ++ PartialFunction.condOpt(CrossVersion.partialVersion(scalaVersion.value)){
-    case Some((2, scalaMajor)) if scalaMajor <= 12 => Seq("-Ypartial-unification", "-Ywarn-unused-import")
-    case Some((2, scalaMajor)) if scalaMajor >= 13 => Seq()
-  }.toList.flatten
-}
-
-lazy val typeSystemEnhancements =
-  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.13.0" cross CrossVersion.full)
-
-lazy val dependencies =
-  libraryDependencies ++= Seq(
-    "co.fs2" %% "fs2-core" % "3.0.6",
-    "org.typelevel" %% "cats-core" % "2.6.1",
-    "org.typelevel" %% "cats-effect" % "3.2.1",
-    "org.typelevel" %% "cats-collections-core" % "0.9.3"
+lazy val docs = project
+  .in(file("mdoc"))
+  .settings(
+    mdocIn := file("docs"),
+    mdocOut := file("target/website"),
+    mdocVariables := Map(
+      "version" -> version.value,
+      "scalaVersions" -> crossScalaVersions.value
+        .map(v => s"- **$v**")
+        .mkString("\n")
+    ),
+    githubWorkflowArtifactUpload := false,
+    fatalWarningsInCI := false
   )
+  .dependsOn(core)
+  .enablePlugins(MdocPlugin, NoPublishPlugin)
 
-lazy val tests = {
-  libraryDependencies ++= Seq(
-    "org.scalacheck" %% "scalacheck" % "1.15.4",
-    "org.scalatest" %% "scalatest" % "3.2.9",
-    "org.scalatestplus" %% "scalacheck-1-15" % "3.2.9.0",
-    "org.typelevel" %% "cats-effect-laws" % "3.2.1"
-  ).map(_ % "test")
-}
+ThisBuild / githubWorkflowJavaVersions := Seq("adopt@1.11.0-11")
 
-lazy val docs =
-  scalacOptions in (Compile, doc) ++= Seq(
-    "-no-link-warnings"
+ThisBuild / githubWorkflowBuildPostamble ++= List(
+  WorkflowStep.Sbt(
+    List("docs/mdoc"),
+    cond = Some(s"matrix.scala == '$Scala213'")
   )
+)
 
-lazy val publishSettings = {
-  import ReleaseTransformations._
-
-  val username = "SystemFw"
-
-  Seq(
-    homepage := Some(url(s"https://github.com/$username/${name.value}")),
-    licenses += "MIT" -> url("http://opensource.org/licenses/MIT"),
-    scmInfo := Some(
-      ScmInfo(
-        url(s"https://github.com/$username/${name.value}"),
-        s"git@github.com:$username/${name.value}.git"
+ThisBuild / githubWorkflowAddedJobs += WorkflowJob(
+  id = "docs",
+  name = "Deploy docs",
+  needs = List("publish"),
+  cond = """
+  | always() &&
+  | needs.build.result == 'success' &&
+  | (needs.publish.result == 'success' || github.ref == 'refs/heads/docs-deploy')
+  """.stripMargin.trim.linesIterator.mkString.some,
+  steps = githubWorkflowGeneratedDownloadSteps.value.toList :+
+    WorkflowStep.Use(
+      UseRef.Public("peaceiris", "actions-gh-pages", "v3"),
+      name = Some(s"Deploy docs"),
+      params = Map(
+        "publish_dir" -> "./target/website",
+        "github_token" -> "${{ secrets.GITHUB_TOKEN }}"
       )
     ),
-    publishMavenStyle := true,
-    publishArtifact in Test := false,
-    publishTo := Some(
-      if (isSnapshot.value)
-        Opts.resolver.sonatypeSnapshots
-      else Opts.resolver.sonatypeStaging
-    ),
-    pomExtra := (
-      <developers>
-        <developer>
-         <id>{username}</id>
-         <name>Fabio Labella</name>
-         <url>http://github.com/{username}</url>
-        </developer>
-      </developers>
-    ),
-    releaseCrossBuild := true,
-    releasePublishArtifactsAction := PgpKeys.publishSigned.value,
-    releaseProcess := Seq[ReleaseStep](
-      checkSnapshotDependencies,
-      inquireVersions,
-      runClean,
-      runTest,
-      setReleaseVersion,
-      commitReleaseVersion,
-      tagRelease,
-      publishArtifacts,
-      setNextVersion,
-      commitNextVersion,
-      releaseStepCommand("sonatypeReleaseAll"),
-      pushChanges
-    )
-  )
-}
+  scalas = List(Scala213),
+  javas = githubWorkflowJavaVersions.value.toList
+)
