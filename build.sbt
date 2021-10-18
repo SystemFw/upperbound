@@ -54,7 +54,7 @@ lazy val core = project
       dep("org.typelevel", "cats-effect", "3.3-162-2022ef9")("")("-laws", "-testkit") ++
       dep("co.fs2", "fs2-", "3.1.3")("core")() ++
       dep("org.scalameta", "munit", "0.7.29")()("", "-scalacheck") ++
-      dep("org.typelevel", "", "1.0.5")()("munit-cats-effect-3") ++
+      dep("org.typelevel", "", "1.0.6")()("munit-cats-effect-3") ++
       dep("org.typelevel",  "scalacheck-effect", "1.0.2")()("", "-munit")
   )
 
