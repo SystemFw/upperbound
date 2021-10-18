@@ -1,11 +1,10 @@
-<!-- <img src="yourlogo.png" width="100" align="center"/> -->
+# Upperbound
 
-# $name$
+> A simple, purely functional rate limiter
 
-> Awesome
-
-- does this
-- does that
+- Interval-based design to prevent bursts
+- Prioritised jobs
+- Controls both rate and concurrency
 
 [Getting started](installing.md)
 

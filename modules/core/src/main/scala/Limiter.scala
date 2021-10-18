@@ -42,10 +42,12 @@ trait Limiter[F[_]] {
     * creating the [[Limiter]].
     *
     * In case of failure, the returned `F[A]` will fail with the same
-    * error `job` failed with.
-    * It can also fail with a [[LimitReachedException]] if the number of
-    * enqueued jobs is past the limit you specify when creating the
-    * [[Limiter]].
+    * error `job` failed with. Note that in **upperbound** no errors
+    * are thrown if a job is rate limited, it simply waits to be
+    * executed in a queue.
+    * `submit` can however fail with a [[LimitReachedException]] if
+    * the number of enqueued jobs is past the limit you specify when
+    * creating the [[Limiter]].
     *
     * Cancelation semantics are respected, and cancelling the returned
     * `F[A]` will also cancel the execution of `job`.
@@ -90,39 +92,47 @@ object Limiter {
   /** Creates a new [[Limiter]] and starts processing submitted jobs at a
     * regular rate, in priority order.
     *
+    * It's recommended to use an explicit type ascription such
+    * as `Limiter.start[IO]` or `Limiter.start[F]` when calling
+    * `start`, to avoid type inference issues.
+    * 
     * In order to avoid bursts, jobs submitted to the [[Limiter]] are
     * started at regular intervals, as specified by the `minInterval`
     * parameter.
     * You can pass `minInterval` as a `FiniteDuration`, or using
-    * `upperbound`'s rate syntax (note the underscores in the imports):
+    * **upperbound**'s rate syntax (note the underscore in the `rate`
+    * import):
     * {{{
+    * import upperbound._
     * import upperbound.syntax.rate._
     * import scala.concurrent.duration._
+    * import cats.effect._
     *
-    * Limiter.start(minInterval = 1.second)
+    * Limiter.start[IO](minInterval = 1.second)
     *
     * // or
     *
-    * Limiter.start(minInterval = 60 every 1.minute)
+    * Limiter.start[IO](minInterval = 60 every 1.minute)
     * }}}
     *
-    * If the duration of some jobs is longer than `minInterval`, multiple
-    * jobs will be started concurrently.
+    * 
+    * If the duration of some jobs is longer than `minInterval`,
+    * multiple jobs will be started concurrently.
     * You can limit the amount of concurrency with the `maxConcurrent`
     * parameter: upon reaching `maxConcurrent` running jobs, the
     * [[Limiter]] will stop pulling new ones until old ones terminate.
     * Note that this means that the specified interval between jobs is
     * indeed a _minimum_ interval, and it could be longer if the
-    * `maxConcurrent` bound gets hit. The default to no limit.
+    * `maxConcurrent` bound gets hit. The default is no limit.
     *
     * Jobs that are waiting to be executed are queued up in memory, and
     * you can control the maximum size of this queue with the
-    * `maxConcurrent` parameter.
+    * `maxQueued` parameter.
     * Once this number is reached, submitting new jobs will immediately
     * fail with a [[LimitReachedException], so that you can in turn signal
     * for backpressure downstream. Submission is allowed again as soon as
-    * the number of jobs waiting goes below `maxConcurrent`.
-    * `maxConcurrent` must be > 0. The default is no limit.
+    * the number of jobs waiting goes below `maxQueued`.
+    * `maxQueued` must be > 0. The default is no limit.
     *
     * [[Limiter]] accepts jobs at different priorities, with jobs at a
     * higher priority being executed before lower priority ones.
@@ -135,7 +145,7 @@ object Limiter {
     * `Resource` once, and passing the resulting [[Limiter]] as an
     * argument whenever needed.
     * When the `Resource` is finalised, all pending and running jobs are
-    * canceled. All outstanding calls to `submit` also canceled.
+    * canceled. All outstanding calls to `submit` are also canceled.
     */
   def start[F[_]: Temporal](
       minInterval: FiniteDuration,
