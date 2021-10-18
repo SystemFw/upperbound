@@ -55,7 +55,7 @@ lazy val core = project
       dep("co.fs2", "fs2-", "3.1.3")("core")() ++
       dep("org.scalameta", "munit", "0.7.29")()("", "-scalacheck") ++
       dep("org.typelevel", "", "1.0.5")()("munit-cats-effect-3") ++
-      dep("org.typelevel",  "scalacheck-effect", "1.0.2")()("", "-munit")
+      dep("org.typelevel",  "scalacheck-effect", "1.0.3")()("", "-munit")
   )
 
 lazy val docs = project
