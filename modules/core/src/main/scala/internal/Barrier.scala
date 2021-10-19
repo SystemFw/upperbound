@@ -43,7 +43,7 @@ trait Barrier[F[_]] {
   def exit: F[Unit]
 }
 object Barrier {
-  def create[F[_]: Concurrent](initialLimit: Int): F[Barrier[F]] = {
+  def apply[F[_]: Concurrent](initialLimit: Int): F[Barrier[F]] = {
     val F = Concurrent[F]
 
     case class State(

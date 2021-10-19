@@ -24,11 +24,12 @@ package upperbound
 import cats._
 import cats.syntax.all._
 import cats.effect._
-import cats.effect.syntax.all._
+import cats.effect.implicits._
+import cats.effect.std.Supervisor
 import fs2._
 import scala.concurrent.duration._
 
-import upperbound.internal.{Queue, Task}
+import upperbound.internal.{Queue, Task, Barrier}
 
 /** A purely functional, interval based rate limiter.
   */
@@ -154,7 +155,16 @@ object Limiter {
     assert(maxQueued > 0, s"n must be > 0, was $maxQueued")
     assert(maxConcurrent > 0, s"n must be > 0, was $maxConcurrent")
 
-    Resource.eval(Queue[F, F[Unit]](maxQueued)).flatMap { queue =>
+    val F = Temporal[F]
+
+    val resources =
+      (
+        Resource.eval(Queue[F, F[Unit]](maxQueued)),
+        Resource.eval(Barrier[F](maxConcurrent)),
+        Supervisor[F]
+      ).tupled
+
+    resources.flatMap { case (queue, barrier, supervisor) =>
       val limiter = new Limiter[F] {
         def submit[A](
             job: F[A],
@@ -176,6 +186,22 @@ object Limiter {
 
         def pending: F[Int] = queue.size
       }
+
+      // this only gets cancelled if the limiter needs shutting down, no
+      // interruption safety needed needed except canceling running
+      // fibers, which happens automatically through supervisor
+      def executor2: F[Unit] =
+        (queue.dequeue, barrier.enter, F.sleep(minInterval)).parTupled
+          .map(_._1)
+          .flatMap { fa =>
+            // F.unit to make sure we exit the barrier even if fa is
+            // canceled before getting executed
+            val job = (F.unit >> fa).guarantee(barrier.exit)
+
+            supervisor.supervise(job) >> executor2
+          }
+
+      executor2.background.as(limiter)
 
       // we want a fixed delay rather than fixed rate, so that when
       // waking up after waiting for `maxConcurrent` to lower, there are
