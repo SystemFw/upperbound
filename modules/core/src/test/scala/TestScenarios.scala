@@ -83,11 +83,9 @@ object TestScenarios {
       def job(i: Int) =
         record(startTimes) >> Temporal[F].sleep(t.jobCompletion).as(i)
 
-      def pulse = Stream.fixedRate[F](t.productionInterval)
-
       def concurrentProducers: Pipe[F, Unit, Unit] =
         producer =>
-          Stream(producer zipLeft pulse).repeat
+          Stream(producer.meteredStartImmediately(t.productionInterval)).repeat
             .take(t.producers.toLong)
             .parJoin(t.producers)
 

@@ -190,33 +190,45 @@ object Limiter {
       // this only gets cancelled if the limiter needs shutting down, no
       // interruption safety needed needed except canceling running
       // fibers, which happens automatically through supervisor
-      def executor2: F[Unit] =
-        (queue.dequeue, barrier.enter, F.sleep(minInterval)).parTupled
-          .map(_._1)
-          .flatMap { fa =>
-            // F.unit to make sure we exit the barrier even if fa is
-            // canceled before getting executed
-            val job = (F.unit >> fa).guarantee(barrier.exit)
+      def executor2: F[Unit] = {
+        def go: F[Unit] =
+          (
+            queue.dequeue
+            //  , barrier.enter
+            ,
+            F.sleep(minInterval) // TODO after replacing this with Pulse, embed the "start immediately on first call there"?
+          ).parTupled
+            .map(_._1)
+            .flatMap { fa =>
+              // F.unit to make sure we exit the barrier even if fa is
+              // canceled before getting executed
+              val job = (F.unit >> fa) //.guarantee(barrier.exit)
 
-            supervisor.supervise(job) >> executor2
-          }
+              supervisor.supervise(job) >> go
+            }
+
+        // start immediately, then go into loop
+        queue.dequeue.flatMap { fa =>
+          val job = (F.unit >> fa) //.guarantee(barrier.exit)
+          supervisor.supervise(job) >> go
+        }
+      }
 
       executor2.background.as(limiter)
+    // we want a fixed delay rather than fixed rate, so that when
+    // waking up after waiting for `maxConcurrent` to lower, there are
+    // no bursts
+    // val executor: Stream[F, Unit] =
+    //   queue.dequeueAll
+    //     .zipLeft(Stream.fixedDelay(minInterval))
+    //     .mapAsyncUnordered(maxConcurrent)(task => task)
 
-      // we want a fixed delay rather than fixed rate, so that when
-      // waking up after waiting for `maxConcurrent` to lower, there are
-      // no bursts
-      val executor: Stream[F, Unit] =
-        queue.dequeueAll
-          .zipLeft(Stream.fixedDelay(minInterval))
-          .mapAsyncUnordered(maxConcurrent)(task => task)
-
-      Stream
-        .emit(limiter)
-        .concurrently(executor)
-        .compile
-        .resource
-        .lastOrError
+    // Stream
+    //   .emit(limiter)
+    //   .concurrently(executor)
+    //   .compile
+    //   .resource
+    //   .lastOrError
     }
   }
 

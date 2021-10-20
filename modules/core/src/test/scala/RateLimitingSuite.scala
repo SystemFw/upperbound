@@ -64,7 +64,6 @@ class RateLimitingSuite extends BaseSuite {
     )
 
     TestControl.executeEmbed(mkScenario[IO](conditions)).map { r =>
-      // adjust once final details of the TestControl api are finalised
       assert(r.jobExecutionMetrics.diffs.forall(_ == 200L))
     }
   }
@@ -80,7 +79,6 @@ class RateLimitingSuite extends BaseSuite {
     )
 
     TestControl.executeEmbed(mkScenario[IO](conditions)).map { r =>
-      // adjust once final details of the TestControl api are finalised
       assert(
         r.jobExecutionMetrics.diffs.forall(_ == 300L)
       )
