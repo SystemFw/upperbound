@@ -34,7 +34,8 @@ class RateLimitingSuite extends BaseSuite {
     IO.ref(false)
       .flatMap { complete =>
         Limiter.start[IO](200.millis).use {
-          _.submit(complete.set(true).as("done")).product(complete.get)
+          _.submit(complete.set(true).as("done"))
+            .product(complete.get)
         }
       }
       .map { case (res, state) =>

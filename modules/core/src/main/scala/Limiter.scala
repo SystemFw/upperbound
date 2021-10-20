@@ -164,6 +164,9 @@ object Limiter {
         Supervisor[F]
       ).tupled
 
+    // TODO remove
+    def p(s: String) = F.unit.map(_ => println(s))
+
     resources.flatMap { case (queue, barrier, supervisor) =>
       val limiter = new Limiter[F] {
         def submit[A](
@@ -193,28 +196,30 @@ object Limiter {
       def executor2: F[Unit] = {
         def go: F[Unit] =
           (
-            queue.dequeue
-            //  , barrier.enter
-            ,
-            F.sleep(minInterval) // TODO after replacing this with Pulse, embed the "start immediately on first call there"?
+            queue.dequeue,
+            barrier.enter,
+            F.sleep(
+              minInterval
+            ) // TODO after replacing this with Pulse, embed the "start immediately on first call there"?
           ).parTupled
             .map(_._1)
             .flatMap { fa =>
               // F.unit to make sure we exit the barrier even if fa is
               // canceled before getting executed
-              val job = (F.unit >> fa) //.guarantee(barrier.exit)
+              val job = (F.unit >> fa).guarantee(barrier.exit)
 
               supervisor.supervise(job) >> go
             }
 
         // start immediately, then go into loop
-        queue.dequeue.flatMap { fa =>
-          val job = (F.unit >> fa) //.guarantee(barrier.exit)
+        (queue.dequeue, barrier.enter).parTupled.map(_._1).flatMap { fa =>
+          val job = (F.unit >> fa).guarantee(barrier.exit)
           supervisor.supervise(job) >> go
         }
       }
 
       executor2.background.as(limiter)
+
     // we want a fixed delay rather than fixed rate, so that when
     // waking up after waiting for `maxConcurrent` to lower, there are
     // no bursts

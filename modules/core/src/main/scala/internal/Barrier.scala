@@ -60,7 +60,7 @@ object Barrier {
     def wakeUp(waiting: Option[Deferred[F, Unit]]) =
       waiting.traverse_(_.complete(()))
 
-    F.ref(State(initialLimit, 0, None)).map { state =>
+    F.ref(State(0, initialLimit, None)).map { state =>
       new Barrier[F] {
         def enter: F[Unit] =
           F.deferred[Unit].flatMap { wait =>
