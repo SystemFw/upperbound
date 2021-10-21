@@ -34,6 +34,7 @@ ThisBuild / initialCommands := """
 """.stripMargin
 
 ThisBuild / testFrameworks += new TestFramework("munit.Framework")
+ThisBuild / Test / parallelExecution := false
 
 def dep(org: String, prefix: String, version: String)(modules: String*)(testModules: String*) =
   modules.map(m => org %% (prefix ++ m) % version) ++
