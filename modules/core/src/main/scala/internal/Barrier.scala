@@ -63,15 +63,26 @@ object Barrier {
     F.ref(State(0, initialLimit, None)).map { state =>
       new Barrier[F] {
         def enter: F[Unit] =
-          F.deferred[Unit].flatMap { wait =>
-            state.modify {
-              case s @ State(_, _, Some(waiting @ _)) =>
-                s -> F.raiseError[Unit](singleProducerViolation)
-              case State(running, limit, None) =>
-                if (running < limit)
-                  State(running + 1, limit, None) -> F.unit
-                else State(running, limit, Some(wait)) -> (wait.get >> enter)
-            }.flatten
+          F.uncancelable { poll =>
+            F.deferred[Unit].flatMap { wait =>
+              val waitForChanges = poll(wait.get).onCancel {
+                state.update(s => State(s.running, s.limit, None))
+              }
+
+              state.modify {
+                case s @ State(_, _, Some(waiting @ _)) =>
+                  s -> F.raiseError[Unit](singleProducerViolation)
+                case State(running, limit, None) =>
+                  if (running < limit)
+                    State(running + 1, limit, None) -> F.unit
+                  else
+                    State(
+                      running,
+                      limit,
+                      Some(wait)
+                    ) -> (waitForChanges >> enter)
+              }.flatten
+            }
           }
 
         def exit: F[Unit] =

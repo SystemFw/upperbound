@@ -191,8 +191,8 @@ object Limiter {
       }
 
       // this only gets cancelled if the limiter needs shutting down, no
-      // interruption safety needed needed except canceling running
-      // fibers, which happens automatically through supervisor
+      // interruption safety needed except canceling running fibers,
+      // which happens automatically through supervisor
       def executor2: F[Unit] = {
         def go: F[Unit] =
           (
