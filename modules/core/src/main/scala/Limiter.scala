@@ -29,7 +29,7 @@ import cats.effect.std.Supervisor
 import fs2._
 import scala.concurrent.duration._
 
-import upperbound.internal.{Queue, Task, Barrier}
+import upperbound.internal.{Queue, Task, Barrier, Pulse}
 
 /** A purely functional, interval based rate limiter.
   */
@@ -161,13 +161,14 @@ object Limiter {
       (
         Resource.eval(Queue[F, F[Unit]](maxQueued)),
         Resource.eval(Barrier[F](maxConcurrent)),
+        Resource.eval(Pulse[F](minInterval)),
         Supervisor[F]
       ).tupled
 
     // TODO remove
     def p(s: String) = F.unit.map(_ => println(s))
 
-    resources.flatMap { case (queue, barrier, supervisor) =>
+    resources.flatMap { case (queue, barrier, pulse, supervisor) =>
       val limiter = new Limiter[F] {
         def submit[A](
             job: F[A],
@@ -203,7 +204,7 @@ object Limiter {
             (
               queue.dequeue,
               barrier.enter,
-              F.sleep(minInterval)
+              pulse.sleep
             ).parMapN { (next, _, _) => go(next) }.flatten
         }
 

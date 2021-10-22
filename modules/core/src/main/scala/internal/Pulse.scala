@@ -52,6 +52,9 @@ object Pulse {
         def changeInterval(f: FiniteDuration => FiniteDuration): F[Unit] =
           interval.update(f)
 
+        // TODO remove
+        def p(s: String) = F.unit.map(_ => println(s))
+
         def sleep: F[Unit] =
           F.monotonic.flatMap { start =>
             interval.discrete
@@ -59,7 +62,13 @@ object Pulse {
                 val action =
                   F.monotonic.flatMap { now =>
                     val elapsed = now - start
-                    val toSleep = interval - start
+                    val toSleep = interval - elapsed
+
+                    // TODO remove
+                    // p(
+                    //   s"Start: $start, Elapsed: $elapsed, interval: $interval, toSleep: $toSleep"
+                    // ) >>
+
                     F.sleep(toSleep).whenA(toSleep > 0.nanos)
                   }
                 Stream.eval(action)
