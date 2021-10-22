@@ -3,7 +3,7 @@
 Add to your `build.sbt`
 
 ```scala
-libraryDependencies += "org.systemfw" %% "upperbound" % "0.4.0-69-8a34493-SNAPSHOT"
+libraryDependencies += "org.systemfw" %% "upperbound" % "0.4.0-M1"
 ```
 
 `upperbound` is published for the following versions of Scala:
