@@ -95,7 +95,7 @@ object Limiter {
     * It's recommended to use an explicit type ascription such
     * as `Limiter.start[IO]` or `Limiter.start[F]` when calling
     * `start`, to avoid type inference issues.
-    * 
+    *
     * In order to avoid bursts, jobs submitted to the [[Limiter]] are
     * started at regular intervals, as specified by the `minInterval`
     * parameter.
@@ -115,7 +115,6 @@ object Limiter {
     * Limiter.start[IO](minInterval = 60 every 1.minute)
     * }}}
     *
-    * 
     * If the duration of some jobs is longer than `minInterval`,
     * multiple jobs will be started concurrently.
     * You can limit the amount of concurrency with the `maxConcurrent`
@@ -129,7 +128,7 @@ object Limiter {
     * you can control the maximum size of this queue with the
     * `maxQueued` parameter.
     * Once this number is reached, submitting new jobs will immediately
-    * fail with a [[LimitReachedException], so that you can in turn signal
+    * fail with a [[LimitReachedException]], so that you can in turn signal
     * for backpressure downstream. Submission is allowed again as soon as
     * the number of jobs waiting goes below `maxQueued`.
     * `maxQueued` must be > 0. The default is no limit.
