@@ -173,7 +173,7 @@ object Limiter {
         def submit[A](
             job: F[A],
             priority: Int = 0
-        ): F[A] =
+        ): F[A] = F.uncancelable { poll =>
           Task.create(job).flatMap { task =>
             queue
               .enqueue(task.executable, priority)
@@ -184,9 +184,10 @@ object Limiter {
                     task.cancel.whenA(!deleted)
                   }
 
-                task.awaitResult.onCancel(propagateCancelation)
+                poll(task.awaitResult).onCancel(propagateCancelation)
               }
           }
+        }
 
         def pending: F[Int] = queue.size
       }
