@@ -220,6 +220,29 @@ object Limiter {
 
       executor2.background.as(limiter)
 
+      // this only gets cancelled if the limiter needs shutting down, no
+      // interruption safety needed except canceling running fibers,
+      // which happens automatically through supervisor
+      def executor3: F[Unit] = {
+        def go(fa: F[Unit]): F[Unit] = {
+          // F.unit to make sure we exit the barrier even if fa is
+          // canceled before getting executed
+          val job = (F.unit >> fa).guarantee(barrier.exit)
+
+          supervisor.supervise(job) >>
+            (
+              queue.dequeue,
+              barrier.enter,
+              F.sleep(minInterval)
+            ).parMapN { (next, _, _) => go(next) }.flatten
+        }
+
+        // execute fhe first task immediately
+        (queue.dequeue, barrier.enter).parMapN { (next, _) => go(next) }.flatten
+      }
+
+      executor3.background.as(limiter)
+
     // we want a fixed delay rather than fixed rate, so that when
     // waking up after waiting for `maxConcurrent` to lower, there are
     // no bursts
