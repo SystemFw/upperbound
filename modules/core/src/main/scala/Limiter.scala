@@ -193,36 +193,6 @@ object Limiter {
       // this only gets cancelled if the limiter needs shutting down, no
       // interruption safety needed except canceling running fibers,
       // which happens automatically through supervisor
-      def executor2: F[Unit] = {
-        def go: F[Unit] =
-          (
-            queue.dequeue,
-            barrier.enter,
-            F.sleep(
-              minInterval
-            ) // TODO after replacing this with Pulse, embed the "start immediately on first call there"?
-          ).parTupled
-            .map(_._1)
-            .flatMap { fa =>
-              // F.unit to make sure we exit the barrier even if fa is
-              // canceled before getting executed
-              val job = (F.unit >> fa).guarantee(barrier.exit)
-
-              supervisor.supervise(job) >> go
-            }
-
-        // start immediately, then go into loop
-        (queue.dequeue, barrier.enter).parTupled.map(_._1).flatMap { fa =>
-          val job = (F.unit >> fa).guarantee(barrier.exit)
-          supervisor.supervise(job) >> go
-        }
-      }
-
-      executor2.background.as(limiter)
-
-      // this only gets cancelled if the limiter needs shutting down, no
-      // interruption safety needed except canceling running fibers,
-      // which happens automatically through supervisor
       def executor3: F[Unit] = {
         def go(fa: F[Unit]): F[Unit] = {
           // F.unit to make sure we exit the barrier even if fa is
