@@ -42,7 +42,7 @@ import java.util.ConcurrentModificationException
 // - reduce time, don't complete (cancel, start new one)
 trait Pulse[F[_]] {
   def changeInterval(f: FiniteDuration => FiniteDuration): F[Unit]
-  def await: F[Unit]
+  def sleep: F[Unit]
 }
 object Pulse {
   def apply[F[_]: Temporal](initialInterval: FiniteDuration) = {
@@ -52,7 +52,7 @@ object Pulse {
         def changeInterval(f: FiniteDuration => FiniteDuration): F[Unit] =
           interval.update(f)
 
-        def await: F[Unit] =
+        def sleep: F[Unit] =
           F.monotonic.flatMap { start =>
             interval.discrete
               .switchMap { interval =>
