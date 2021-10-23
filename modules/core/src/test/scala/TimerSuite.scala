@@ -55,7 +55,7 @@ class TimerSuite extends BaseSuite {
     val prog = newTimer(1.second).flatMap { case (timer, t0) =>
       timer.sleep >>
         elapsedSince(t0).mproduct { t1 =>
-          timer.changeInterval(_ + 1.second) >>
+          timer.interval.update(_ + 1.second) >>
             timer.sleep >>
             elapsedSince(t1)
         }
@@ -67,7 +67,7 @@ class TimerSuite extends BaseSuite {
   test("reset while sleeping, interval increased") {
     val prog = setup(2.seconds).flatMap { case (timer, getResult) =>
       IO.sleep(1.second) >>
-        timer.changeInterval(_ => 3.seconds) >>
+        timer.interval.set(3.seconds) >>
         getResult
     }
 
@@ -77,7 +77,7 @@ class TimerSuite extends BaseSuite {
   test("reset while sleeping, interval decreased but still in the future") {
     val prog = setup(5.seconds).flatMap { case (timer, getResult) =>
       IO.sleep(1.second) >>
-        timer.changeInterval(_ => 3.seconds) >>
+        timer.interval.set(3.seconds) >>
         getResult
     }
 
@@ -87,7 +87,7 @@ class TimerSuite extends BaseSuite {
   test("reset while sleeping, interval decreased and has already elapsed") {
     val prog = setup(5.seconds).flatMap { case (timer, getResult) =>
       IO.sleep(2.second) >>
-        timer.changeInterval(_ => 1.seconds) >>
+        timer.interval.set(1.seconds) >>
         getResult
     }
 
@@ -97,11 +97,11 @@ class TimerSuite extends BaseSuite {
   test("multiple resets while sleeping, latest wins") {
     val prog = setup(10.seconds).flatMap { case (timer, getResult) =>
       IO.sleep(1.second) >>
-        timer.changeInterval(_ => 15.seconds) >>
+        timer.interval.set(15.seconds) >>
         IO.sleep(3.seconds) >>
-        timer.changeInterval(_ => 8.seconds) >>
+        timer.interval.set(8.seconds) >>
         IO.sleep(2.seconds) >>
-        timer.changeInterval(_ => 4.seconds) >>
+        timer.interval.set(4.seconds) >>
         getResult
     }
 

@@ -22,39 +22,29 @@
 package upperbound
 package internal
 
-import fs2._
-import cats.effect._
-import cats.effect.implicits._
-import cats.effect.std.Supervisor
-import fs2.concurrent.SignallingRef
 import cats.syntax.all._
+import fs2.Stream
+import cats.effect.Temporal
+import fs2.concurrent.SignallingRef
 import scala.concurrent.duration._
-import java.util.ConcurrentModificationException
 
-// single consumer waiting, the sleeping is pull based
-// interval can be changed my multiple fibers
-// changes take effect asap
-// changing interval, various cases
-// idle: do nothing
-// while waiting:
-// - add time, don't complete
-// - reduce time, complete (cancel, don't start new one)
-// - reduce time, don't complete (cancel, start new one)
+/** Resettable timer.
+  * If the interval gets reset while a sleep is happening, the
+  * duration of the sleep is adjusted on the fly, taking into account
+  * any elapsed time.
+  * This might mean waking up instantly if the entire new interval has
+  * already elapsed.
+  */
 trait Timer[F[_]] {
-  def changeInterval(f: FiniteDuration => FiniteDuration): F[Unit]
+  def interval: SignallingRef[F, FiniteDuration]
   def sleep: F[Unit]
 }
 object Timer {
   def apply[F[_]: Temporal](initialInterval: FiniteDuration) = {
     val F = Temporal[F]
-    SignallingRef[F, FiniteDuration](initialInterval).map { interval =>
+    SignallingRef[F, FiniteDuration](initialInterval).map { interval_ =>
       new Timer[F] {
-        def changeInterval(f: FiniteDuration => FiniteDuration): F[Unit] =
-          interval.update(f)
-
-        // TODO remove
-        def p(s: String) = F.unit.map(_ => println(s))
-
+        def interval: SignallingRef[F, FiniteDuration] = interval_
         def sleep: F[Unit] =
           F.monotonic.flatMap { start =>
             interval.discrete
@@ -64,16 +54,11 @@ object Timer {
                     val elapsed = now - start
                     val toSleep = interval - elapsed
 
-                    // TODO remove
-                    // p(
-                    //   s"Start: $start, Elapsed: $elapsed, interval: $interval, toSleep: $toSleep"
-                    // ) >>
-
                     F.sleep(toSleep).whenA(toSleep > 0.nanos)
                   }
                 Stream.eval(action)
               }
-              .take(1) // as soon as one inner stream completes, I'm done?
+              .take(1)
               .compile
               .drain
           }
