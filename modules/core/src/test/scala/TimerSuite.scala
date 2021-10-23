@@ -25,22 +25,22 @@ import cats.effect.IO
 import cats.syntax.all._
 import scala.concurrent.duration._
 
-import upperbound.internal.Pulse
+import upperbound.internal.Timer
 
 import cats.effect.testkit.TestControl
 
-class PulseSuite extends BaseSuite {
-  def newPulse(interval: FiniteDuration): IO[(Pulse[IO], FiniteDuration)] =
-    Pulse[IO](interval).product(IO.monotonic)
+class TimerSuite extends BaseSuite {
+  def newTimer(interval: FiniteDuration): IO[(Timer[IO], FiniteDuration)] =
+    Timer[IO](interval).product(IO.monotonic)
 
   def elapsedSince(t0: FiniteDuration) =
     IO.monotonic.map(t => t - t0)
 
-  def setup(interval: FiniteDuration): IO[(Pulse[IO], IO[FiniteDuration])] =
-    newPulse(interval).flatMap { case (pulse, t0) =>
-      (pulse.sleep >> elapsedSince(t0)).start
+  def setup(interval: FiniteDuration): IO[(Timer[IO], IO[FiniteDuration])] =
+    newTimer(interval).flatMap { case (timer, t0) =>
+      (timer.sleep >> elapsedSince(t0)).start
         .map(_.joinWithNever)
-        .tupleLeft(pulse)
+        .tupleLeft(timer)
     }
 
   def run[A](io: IO[A]) = TestControl.executeEmbed(io)
@@ -52,11 +52,11 @@ class PulseSuite extends BaseSuite {
   }
 
   test("sequential resets") {
-    val prog = newPulse(1.second).flatMap { case (pulse, t0) =>
-      pulse.sleep >>
+    val prog = newTimer(1.second).flatMap { case (timer, t0) =>
+      timer.sleep >>
         elapsedSince(t0).mproduct { t1 =>
-          pulse.changeInterval(_ + 1.second) >>
-            pulse.sleep >>
+          timer.changeInterval(_ + 1.second) >>
+            timer.sleep >>
             elapsedSince(t1)
         }
     }
@@ -65,9 +65,9 @@ class PulseSuite extends BaseSuite {
   }
 
   test("reset while sleeping, interval increased") {
-    val prog = setup(2.seconds).flatMap { case (pulse, getResult) =>
+    val prog = setup(2.seconds).flatMap { case (timer, getResult) =>
       IO.sleep(1.second) >>
-        pulse.changeInterval(_ => 3.seconds) >>
+        timer.changeInterval(_ => 3.seconds) >>
         getResult
     }
 
@@ -75,9 +75,9 @@ class PulseSuite extends BaseSuite {
   }
 
   test("reset while sleeping, interval decreased but still in the future") {
-    val prog = setup(5.seconds).flatMap { case (pulse, getResult) =>
+    val prog = setup(5.seconds).flatMap { case (timer, getResult) =>
       IO.sleep(1.second) >>
-        pulse.changeInterval(_ => 3.seconds) >>
+        timer.changeInterval(_ => 3.seconds) >>
         getResult
     }
 
@@ -85,9 +85,9 @@ class PulseSuite extends BaseSuite {
   }
 
   test("reset while sleeping, interval decreased and has already elapsed") {
-    val prog = setup(5.seconds).flatMap { case (pulse, getResult) =>
+    val prog = setup(5.seconds).flatMap { case (timer, getResult) =>
       IO.sleep(2.second) >>
-        pulse.changeInterval(_ => 1.seconds) >>
+        timer.changeInterval(_ => 1.seconds) >>
         getResult
     }
 
@@ -95,13 +95,13 @@ class PulseSuite extends BaseSuite {
   }
 
   test("multiple resets while sleeping, latest wins") {
-    val prog = setup(10.seconds).flatMap { case (pulse, getResult) =>
+    val prog = setup(10.seconds).flatMap { case (timer, getResult) =>
       IO.sleep(1.second) >>
-        pulse.changeInterval(_ => 15.seconds) >>
+        timer.changeInterval(_ => 15.seconds) >>
         IO.sleep(3.seconds) >>
-        pulse.changeInterval(_ => 8.seconds) >>
+        timer.changeInterval(_ => 8.seconds) >>
         IO.sleep(2.seconds) >>
-        pulse.changeInterval(_ => 4.seconds) >>
+        timer.changeInterval(_ => 4.seconds) >>
         getResult
     }
 

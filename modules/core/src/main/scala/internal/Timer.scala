@@ -40,15 +40,15 @@ import java.util.ConcurrentModificationException
 // - add time, don't complete
 // - reduce time, complete (cancel, don't start new one)
 // - reduce time, don't complete (cancel, start new one)
-trait Pulse[F[_]] {
+trait Timer[F[_]] {
   def changeInterval(f: FiniteDuration => FiniteDuration): F[Unit]
   def sleep: F[Unit]
 }
-object Pulse {
+object Timer {
   def apply[F[_]: Temporal](initialInterval: FiniteDuration) = {
     val F = Temporal[F]
     SignallingRef[F, FiniteDuration](initialInterval).map { interval =>
-      new Pulse[F] {
+      new Timer[F] {
         def changeInterval(f: FiniteDuration => FiniteDuration): F[Unit] =
           interval.update(f)
 
