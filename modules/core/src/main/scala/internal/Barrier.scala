@@ -25,6 +25,7 @@ package internal
 import cats.effect._
 import cats.effect.implicits._
 import cats.syntax.all._
+import fs2.concurrent.SignallingRef
 
 import java.util.ConcurrentModificationException
 
@@ -35,10 +36,8 @@ import java.util.ConcurrentModificationException
   */
 trait Barrier[F[_]] {
 
-  /** Changes the current limit on running tasks.
-    * Can be called concurrently.
-    */
-  def changeLimit(update: Int => Int): F[Unit]
+  /** Controls the current limit on running tasks. */
+  def limit: SignallingRef[F, Int]
 
   /** Tries to enter the barrier, semantically blocking if the number
     * of running task is at or past the limit.
@@ -60,7 +59,7 @@ trait Barrier[F[_]] {
   def exit: F[Unit]
 }
 object Barrier {
-  def apply[F[_]: Concurrent](initialLimit: Int): F[Barrier[F]] = {
+  def apply[F[_]: Concurrent](initialLimit: Int): Resource[F, Barrier[F]] = {
     val F = Concurrent[F]
 
     case class State(
@@ -77,8 +76,15 @@ object Barrier {
     def wakeUp(waiting: Option[Deferred[F, Unit]]) =
       waiting.traverse_(_.complete(()))
 
-    F.ref(State(0, initialLimit, None)).map { state =>
-      new Barrier[F] {
+    val resources = Resource.eval {
+      (
+        F.ref(State(0, initialLimit, None)),
+        SignallingRef[F, Int](initialLimit)
+      ).tupled
+    }
+
+    resources.flatMap { case (state, limit_) =>
+      val barrier = new Barrier[F] {
         def enter: F[Unit] =
           F.uncancelable { poll =>
             F.deferred[Unit].flatMap { wait =>
@@ -113,18 +119,26 @@ object Barrier {
             .flatten
             .uncancelable
 
-        def changeLimit(update: Int => Int): F[Unit] =
-          state
-            .modify { case State(running, limit, waiting) =>
-              val newLimit = update(limit)
-              if (running < newLimit)
-                State(running, newLimit, None) -> wakeUp(waiting)
-              else State(running, newLimit, waiting) -> F.unit
-            }
-            .flatten
-            .uncancelable
+        val limit = limit_
       }
-    }
 
+      val limitChanges =
+        barrier.limit.discrete
+          .evalMap { newLimit =>
+            state
+              .modify { case State(running, _, waiting) =>
+                if (running < newLimit)
+                  State(running, newLimit, None) -> wakeUp(waiting)
+                else State(running, newLimit, waiting) -> F.unit
+              }
+              .flatten
+              .uncancelable
+          }
+          .compile
+          .drain
+
+      limitChanges.background.as(barrier)
+    }
   }
+
 }

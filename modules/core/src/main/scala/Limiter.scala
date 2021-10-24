@@ -160,7 +160,7 @@ object Limiter {
     val resources =
       (
         Resource.eval(Queue[F, F[Unit]](maxQueued)),
-        Resource.eval(Barrier[F](maxConcurrent)),
+        Barrier[F](maxConcurrent),
         Resource.eval(Timer[F](minInterval)),
         Supervisor[F]
       ).tupled
@@ -195,7 +195,7 @@ object Limiter {
       // this only gets cancelled if the limiter needs shutting down, no
       // interruption safety needed except canceling running fibers,
       // which happens automatically through supervisor
-      def executor3: F[Unit] = {
+      def executor: F[Unit] = {
         def go(fa: F[Unit]): F[Unit] = {
           // F.unit to make sure we exit the barrier even if fa is
           // canceled before getting executed
@@ -213,7 +213,7 @@ object Limiter {
         (queue.dequeue, barrier.enter).parMapN { (next, _) => go(next) }.flatten
       }
 
-      executor3.background.as(limiter)
+      executor.background.as(limiter)
 
     // we want a fixed delay rather than fixed rate, so that when
     // waking up after waiting for `maxConcurrent` to lower, there are
