@@ -21,13 +21,13 @@
 
 package upperbound
 
-import cats.effect.IO
+import cats.effect._
 import cats.syntax.all._
 import scala.concurrent.duration._
 
 import upperbound.internal.Timer
 
-import cats.effect.testkit.TestControl
+import cats.effect.testkit.TestControl.{executeEmbed => runTC}
 
 class TimerSuite extends BaseSuite {
   def newTimer(interval: FiniteDuration): IO[(Timer[IO], FiniteDuration)] =
@@ -43,12 +43,10 @@ class TimerSuite extends BaseSuite {
         .tupleLeft(timer)
     }
 
-  def run[A](io: IO[A]) = TestControl.executeEmbed(io)
-
   test("behaves like a normal clock if never reset") {
     val prog = setup(1.second).flatMap(_._2)
 
-    run(prog).assertEquals(1.seconds)
+    runTC(prog).assertEquals(1.seconds)
   }
 
   test("sequential resets") {
@@ -61,7 +59,7 @@ class TimerSuite extends BaseSuite {
         }
     }
 
-    run(prog).assertEquals((1.second, 2.seconds))
+    runTC(prog).assertEquals((1.second, 2.seconds))
   }
 
   test("reset while sleeping, interval increased") {
@@ -71,7 +69,7 @@ class TimerSuite extends BaseSuite {
         getResult
     }
 
-    run(prog).assertEquals(3.seconds)
+    runTC(prog).assertEquals(3.seconds)
   }
 
   test("reset while sleeping, interval decreased but still in the future") {
@@ -81,7 +79,7 @@ class TimerSuite extends BaseSuite {
         getResult
     }
 
-    run(prog).assertEquals(3.seconds)
+    runTC(prog).assertEquals(3.seconds)
   }
 
   test("reset while sleeping, interval decreased and has already elapsed") {
@@ -91,7 +89,7 @@ class TimerSuite extends BaseSuite {
         getResult
     }
 
-    run(prog).assertEquals(2.seconds)
+    runTC(prog).assertEquals(2.seconds)
   }
 
   test("multiple resets while sleeping, latest wins") {
@@ -105,6 +103,6 @@ class TimerSuite extends BaseSuite {
         getResult
     }
 
-    run(prog).assertEquals(6.seconds)
+    runTC(prog).assertEquals(6.seconds)
   }
 }
