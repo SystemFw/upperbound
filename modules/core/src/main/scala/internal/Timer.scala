@@ -28,15 +28,19 @@ import cats.effect.Temporal
 import fs2.concurrent.SignallingRef
 import scala.concurrent.duration._
 
-/** Resettable timer.
-  * If the interval gets reset while a sleep is happening, the
-  * duration of the sleep is adjusted on the fly, taking into account
-  * any elapsed time.
-  * This might mean waking up instantly if the entire new interval has
-  * already elapsed.
-  */
+/** Resettable timer. */
 trait Timer[F[_]] {
+
+  /** Controls the current interval */
   def interval: SignallingRef[F, FiniteDuration]
+
+  /** Sleeps for the duration of the current interval.
+    *
+    * If the interval gets reset while a sleep is happening, the
+    * duration of the sleep is adjusted on the fly, taking into
+    * account any elapsed time. This might mean waking up instantly if
+    * the entire new interval has already elapsed.
+    */
   def sleep: F[Unit]
 }
 object Timer {

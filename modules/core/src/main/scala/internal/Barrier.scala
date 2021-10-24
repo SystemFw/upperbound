@@ -28,18 +28,35 @@ import cats.syntax.all._
 
 import java.util.ConcurrentModificationException
 
-// single process acquiring
-// ^^ means I can get away with a single deferred?
-//
-// multiple processes releasing
-// acquire blocks when limit reached
-// limit changes dynamically!
-// it can shrink
-// it can grow
-
+/** A dynamic barrier which is meant to be used in conjunction with a
+  * task executor.
+  * As such, it assumes there is only a single fiber entering the
+  * barrier (the executor), but multiple ones exiting it (the tasks).
+  */
 trait Barrier[F[_]] {
+
+  /** Changes the current limit on running tasks.
+    * Can be called concurrently.
+    */
   def changeLimit(update: Int => Int): F[Unit]
+
+  /** Tries to enter the barrier, semantically blocking if the number
+    * of running task is at or past the limit.
+    * The limit can change dynamically while `enter` is blocked, in
+    * which case `enter` will be unblocked as soon as the number of
+    * running tasks goes beyond the new limit.
+    * Note however that the Barrier does not try to interrupt tasks
+    * that are already running if the limit dynamically shrinks, so
+    * for some time if might be that runningTasks > limit.
+    *
+    * Fails with a ConcurrentModificatioException if called concurrently.
+    */
   def enter: F[Unit]
+
+  /** Called by tasks when exiting the barrier, and will unblock
+    * `enter` when the number of running tasks goes beyond the limit.
+    * Can be called concurrently.
+    */
   def exit: F[Unit]
 }
 object Barrier {
