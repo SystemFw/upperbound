@@ -30,6 +30,17 @@ import internal.Barrier
 import cats.effect.testkit.TestControl.{executeEmbed => runTC}
 
 class BarrierSuite extends BaseSuite {
+  def fillBarrier(barrier: Barrier[IO]): IO[Unit] =
+    barrier.limit.get
+      .flatMap(limit => barrier.enter.replicateA(limit))
+      .void
+
+  def timedStart(fa: IO[_]): Resource[IO, IO[FiniteDuration]] =
+    Resource.eval(IO.monotonic).flatMap { t0 =>
+      val fa_ = fa >> IO.monotonic.map(t => t - t0)
+      Resource.make(fa_.start)(_.cancel).map(_.joinWithNever)
+    }
+
   test("enter the barrier immediately if below the limit") {
     val prog = Barrier[IO](10).use(_.enter)
 
@@ -38,25 +49,19 @@ class BarrierSuite extends BaseSuite {
 
   test("enter blocks when limit is hit") {
     val prog = Barrier[IO](2).use { barrier =>
-      val complete = barrier.enter.as(true).timeoutTo(2.seconds, false.pure[IO])
-      (complete, complete, complete).tupled
+      fillBarrier(barrier) >>
+        barrier.enter.as(true).timeoutTo(2.seconds, false.pure[IO])
     }
 
-    runTC(prog).assertEquals((true, true, false))
+    runTC(prog).assertEquals(false)
   }
 
   test("enter is unblocked by exit") {
-    val prog = Barrier[IO](1)
-      .use { barrier =>
-        barrier.enter >> IO.monotonic.flatMap { start =>
-          (barrier.enter >> IO.monotonic.map(_ - start)).start.flatMap {
-            fiber =>
-              IO.sleep(1.second) >>
-                barrier.exit >>
-                fiber.joinWithNever
-          }
-        }
+    val prog = Barrier[IO](1).use { barrier =>
+      fillBarrier(barrier) >> timedStart(barrier.enter).use { getResult =>
+        IO.sleep(1.second) >> barrier.exit >> getResult
       }
+    }
 
     runTC(prog).assertEquals(1.second)
   }
@@ -64,16 +69,13 @@ class BarrierSuite extends BaseSuite {
   test("enter is unblocked by exit the right amount of times") {
     val prog = Barrier[IO](3)
       .use { barrier =>
-        barrier.enter >> barrier.enter >> barrier.enter >>
-          IO.monotonic.flatMap { start =>
-            (barrier.enter >> barrier.enter >> IO.monotonic.map(
-              _ - start
-            )).start
-              .flatMap { fiber =>
-                IO.sleep(1.second) >> barrier.exit >>
-                  IO.sleep(1.second) >> barrier.exit >>
-                  fiber.joinWithNever
-              }
+        fillBarrier(barrier) >>
+          timedStart(barrier.enter >> barrier.enter).use { getResult =>
+            IO.sleep(1.second) >>
+              barrier.exit >>
+              IO.sleep(1.second) >>
+              barrier.exit >>
+              getResult
           }
       }
 
@@ -83,7 +85,7 @@ class BarrierSuite extends BaseSuite {
   test("Only one fiber can block on enter at the same time") {
     val prog = Barrier[IO](1)
       .use { barrier =>
-        barrier.enter >> (barrier.enter, barrier.enter).parTupled
+        fillBarrier(barrier) >> (barrier.enter, barrier.enter).parTupled
       }
 
     runTC(prog).intercept[Throwable]
@@ -99,10 +101,7 @@ class BarrierSuite extends BaseSuite {
 
   test("Calls to exit cannot outnumber calls to enter") {
     val prog = Barrier[IO](2).use { barrier =>
-      (barrier.enter >> barrier.enter >> IO.sleep(3.seconds)).background
-        .surround {
-          IO.sleep(1.second) >> barrier.exit >> barrier.exit >> barrier.exit
-        }
+      barrier.enter >> barrier.enter >> barrier.exit >> barrier.exit >> barrier.exit
     }
 
     runTC(prog).intercept[Throwable]
@@ -120,16 +119,13 @@ class BarrierSuite extends BaseSuite {
   test("A blocked enter is immediately unblocked if the limit is expanded") {
     val prog = Barrier[IO](3)
       .use { barrier =>
-        barrier.enter >> barrier.enter >> barrier.enter >>
-          IO.monotonic.flatMap { start =>
-            (barrier.enter >> barrier.enter >> IO.monotonic.map(
-              _ - start
-            )).start
-              .flatMap { fiber =>
-                IO.sleep(1.second) >> barrier.limit.set(4) >>
-                  IO.sleep(1.second) >> barrier.limit.set(5) >>
-                  fiber.joinWithNever
-              }
+        fillBarrier(barrier) >>
+          timedStart(barrier.enter >> barrier.enter).use { getResult =>
+            IO.sleep(1.second) >>
+              barrier.limit.set(4) >>
+              IO.sleep(1.second) >>
+              barrier.limit.set(5) >>
+              getResult
           }
       }
 
