@@ -32,7 +32,7 @@ import fs2.concurrent.SignallingRef
   * As such, it assumes there is only a single fiber entering the
   * barrier (the executor), but multiple ones exiting it (the tasks).
   */
-trait Barrier[F[_]] {
+private[upperbound] trait Barrier[F[_]] {
 
   /** Controls the current limit on running tasks. */
   def limit: SignallingRef[F, Int]
@@ -57,7 +57,7 @@ trait Barrier[F[_]] {
     */
   def exit: F[Unit]
 }
-object Barrier {
+private[upperbound] object Barrier {
   def apply[F[_]: Concurrent](initialLimit: Int): Resource[F, Barrier[F]] = {
     val F = Concurrent[F]
 

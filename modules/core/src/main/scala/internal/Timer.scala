@@ -29,7 +29,7 @@ import fs2.concurrent.SignallingRef
 import scala.concurrent.duration._
 
 /** Resettable timer. */
-trait Timer[F[_]] {
+private[upperbound] trait Timer[F[_]] {
 
   /** Controls the current interval */
   def interval: SignallingRef[F, FiniteDuration]
@@ -43,7 +43,7 @@ trait Timer[F[_]] {
     */
   def sleep: F[Unit]
 }
-object Timer {
+private[upperbound] object Timer {
   def apply[F[_]: Temporal](initialInterval: FiniteDuration) = {
     val F = Temporal[F]
     SignallingRef[F, FiniteDuration](initialInterval).map { interval_ =>
