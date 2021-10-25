@@ -22,7 +22,6 @@
 package upperbound
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
 import munit.{CatsEffectSuite, ScalaCheckEffectSuite}
 
 abstract class BaseSuite extends CatsEffectSuite with ScalaCheckEffectSuite {

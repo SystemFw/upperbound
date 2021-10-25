@@ -30,77 +30,82 @@ import upperbound.internal.Timer
 import cats.effect.testkit.TestControl.{executeEmbed => runTC}
 
 class TimerSuite extends BaseSuite {
-  def newTimer(interval: FiniteDuration): IO[(Timer[IO], FiniteDuration)] =
-    Timer[IO](interval).product(IO.monotonic)
+  def newTimer(interval: FiniteDuration) =
+    Resource.eval(Timer[IO](interval))
 
-  def elapsedSince(t0: FiniteDuration) =
-    IO.monotonic.map(t => t - t0)
-
-  def setup(interval: FiniteDuration): IO[(Timer[IO], IO[FiniteDuration])] =
-    newTimer(interval).flatMap { case (timer, t0) =>
-      (timer.sleep >> elapsedSince(t0)).start
+  def timedSleep(timer: Timer[IO]): Resource[IO, IO[FiniteDuration]] =
+    Resource.eval(IO.monotonic).flatMap { t0 =>
+      val fa = timer.sleep >> IO.monotonic.map(t => t - t0)
+      Resource
+        .make(fa.start)(_.cancel)
         .map(_.joinWithNever)
-        .tupleLeft(timer)
     }
 
   test("behaves like a normal clock if never reset") {
-    val prog = setup(1.second).flatMap(_._2)
+    val prog = Timer[IO](1.second).flatMap(timedSleep(_).use(x => x))
 
     runTC(prog).assertEquals(1.seconds)
   }
 
   test("sequential resets") {
-    val prog = newTimer(1.second).flatMap { case (timer, t0) =>
-      timer.sleep >>
-        elapsedSince(t0).mproduct { t1 =>
-          timer.interval.update(_ + 1.second) >>
-            timer.sleep >>
-            elapsedSince(t1)
-        }
+    val prog = Timer[IO](1.second).flatMap { timer =>
+      (
+        timedSleep(timer).use(x => x),
+        timer.interval.update(_ + 1.second),
+        timedSleep(timer).use(x => x)
+      ).mapN((x, _, y) => (x, y))
     }
 
     runTC(prog).assertEquals((1.second, 2.seconds))
   }
 
   test("reset while sleeping, interval increased") {
-    val prog = setup(2.seconds).flatMap { case (timer, getResult) =>
-      IO.sleep(1.second) >>
-        timer.interval.set(3.seconds) >>
-        getResult
+    val prog = Timer[IO](2.seconds).flatMap { timer =>
+      timedSleep(timer).use { getResult =>
+        IO.sleep(1.second) >>
+          timer.interval.set(3.seconds) >>
+          getResult
+      }
     }
 
     runTC(prog).assertEquals(3.seconds)
   }
 
   test("reset while sleeping, interval decreased but still in the future") {
-    val prog = setup(5.seconds).flatMap { case (timer, getResult) =>
-      IO.sleep(1.second) >>
-        timer.interval.set(3.seconds) >>
-        getResult
+    val prog = Timer[IO](5.seconds).flatMap { timer =>
+      timedSleep(timer).use { getResult =>
+        IO.sleep(1.second) >>
+          timer.interval.set(3.seconds) >>
+          getResult
+      }
     }
 
     runTC(prog).assertEquals(3.seconds)
   }
 
   test("reset while sleeping, interval decreased and has already elapsed") {
-    val prog = setup(5.seconds).flatMap { case (timer, getResult) =>
-      IO.sleep(2.second) >>
-        timer.interval.set(1.seconds) >>
-        getResult
+    val prog = Timer[IO](5.seconds).flatMap { timer =>
+      timedSleep(timer).use { getResult =>
+        IO.sleep(2.second) >>
+          timer.interval.set(1.seconds) >>
+          getResult
+      }
     }
 
     runTC(prog).assertEquals(2.seconds)
   }
 
   test("multiple resets while sleeping, latest wins") {
-    val prog = setup(10.seconds).flatMap { case (timer, getResult) =>
-      IO.sleep(1.second) >>
-        timer.interval.set(15.seconds) >>
-        IO.sleep(3.seconds) >>
-        timer.interval.set(8.seconds) >>
-        IO.sleep(2.seconds) >>
-        timer.interval.set(4.seconds) >>
-        getResult
+    val prog = Timer[IO](10.seconds).flatMap { timer =>
+      timedSleep(timer).use { getResult =>
+        IO.sleep(1.second) >>
+          timer.interval.set(15.seconds) >>
+          IO.sleep(3.seconds) >>
+          timer.interval.set(8.seconds) >>
+          IO.sleep(2.seconds) >>
+          timer.interval.set(4.seconds) >>
+          getResult
+      }
     }
 
     runTC(prog).assertEquals(6.seconds)
