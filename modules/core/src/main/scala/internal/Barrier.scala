@@ -48,7 +48,8 @@ trait Barrier[F[_]] {
     * that are already running if the limit dynamically shrinks, so
     * for some time if might be that runningTasks > limit.
     *
-    * Fails with a ConcurrentModificatioException if called concurrently.
+    * Fails with a ConcurrentModificatioException if two fibers block
+    * on `enter` at the same time.
     */
   def enter: F[Unit]
 
