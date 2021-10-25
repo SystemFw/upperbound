@@ -27,8 +27,6 @@ import cats.effect.implicits._
 import cats.syntax.all._
 import fs2.concurrent.SignallingRef
 
-import java.util.ConcurrentModificationException
-
 /** A dynamic barrier which is meant to be used in conjunction with a
   * task executor.
   * As such, it assumes there is only a single fiber entering the
@@ -69,9 +67,14 @@ object Barrier {
         waiting: Option[Deferred[F, Unit]]
     )
 
-    val singleProducerViolation =
-      new ConcurrentModificationException(
+    def singleEnterViolation =
+      new IllegalStateException(
         "Only one fiber can block on the barrier at a time"
+      )
+
+    def runningViolation =
+      new IllegalStateException(
+        "The number of fibers in the barrier can never go below zero"
       )
 
     def wakeUp(waiting: Option[Deferred[F, Unit]]) =
@@ -95,7 +98,7 @@ object Barrier {
 
               state.modify {
                 case s @ State(_, _, Some(waiting @ _)) =>
-                  s -> F.raiseError[Unit](singleProducerViolation)
+                  s -> F.raiseError[Unit](singleEnterViolation)
                 case State(running, limit, None) =>
                   if (running < limit)
                     State(running + 1, limit, None) -> F.unit
@@ -111,9 +114,11 @@ object Barrier {
 
         def exit: F[Unit] =
           state
-            .modify { case State(running, limit, waiting) =>
+            .modify { case s @ State(running, limit, waiting) =>
               val runningNow = running - 1
-              if (runningNow < limit)
+              if (runningNow < 0)
+                s -> F.raiseError[Unit](runningViolation)
+              else if (runningNow < limit)
                 State(runningNow, limit, None) -> wakeUp(waiting)
               else State(runningNow, limit, waiting) -> F.unit
             }

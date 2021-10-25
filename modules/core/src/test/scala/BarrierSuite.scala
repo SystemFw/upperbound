@@ -24,7 +24,6 @@ package upperbound
 import cats.effect._
 import cats.syntax.all._
 import scala.concurrent.duration._
-import java.util.ConcurrentModificationException
 
 import internal.Barrier
 
@@ -93,7 +92,7 @@ class BarrierSuite extends BaseSuite {
       }
       .timeout(timeout)
 
-    runTC(prog).intercept[ConcurrentModificationException]
+    runTC(prog).intercept[IllegalStateException]
   }
 
   test("Cannot call exit without entering") {
@@ -115,7 +114,11 @@ class BarrierSuite extends BaseSuite {
     runTC(prog).intercept[Throwable]
   }
 
-  // limit > 0, both on construction and on change
+  // limit > 0 on construction
+  test("") {}
+  // limit > 0 on change
+  test("") {}
+
 
   // limit expanded while enter blocked, immediate unblock
   test("") {}
