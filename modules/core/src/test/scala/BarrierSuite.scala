@@ -30,18 +30,15 @@ import internal.Barrier
 import cats.effect.testkit.TestControl.{executeEmbed => runTC}
 
 class BarrierSuite extends BaseSuite {
-  // Exact duration irrelevant since tests runs on TestControl
-  val timeout = 10.seconds
-
   test("enter the barrier immediately if below the limit") {
-    val prog = Barrier[IO](10).use(_.enter).timeout(timeout)
+    val prog = Barrier[IO](10).use(_.enter)
 
     runTC(prog)
   }
 
   test("enter blocks when limit is hit") {
     val prog = Barrier[IO](2).use { barrier =>
-      val complete = barrier.enter.as(true).timeoutTo(timeout, false.pure[IO])
+      val complete = barrier.enter.as(true).timeoutTo(2.seconds, false.pure[IO])
       (complete, complete, complete).tupled
     }
 
@@ -60,7 +57,6 @@ class BarrierSuite extends BaseSuite {
           }
         }
       }
-      .timeout(timeout)
 
     runTC(prog).assertEquals(1.second)
   }
@@ -80,7 +76,6 @@ class BarrierSuite extends BaseSuite {
               }
           }
       }
-      .timeout(timeout)
 
     runTC(prog).assertEquals(2.seconds)
   }
@@ -90,9 +85,8 @@ class BarrierSuite extends BaseSuite {
       .use { barrier =>
         barrier.enter >> (barrier.enter, barrier.enter).parTupled
       }
-      .timeout(timeout)
 
-    runTC(prog).intercept[IllegalStateException]
+    runTC(prog).intercept[Throwable]
   }
 
   test("Cannot call exit without entering") {
@@ -100,7 +94,7 @@ class BarrierSuite extends BaseSuite {
       barrier.exit >> barrier.enter
     }
 
-    prog.intercept[Throwable]
+    runTC(prog).intercept[Throwable]
   }
 
   test("Calls to exit cannot outnumber calls to enter") {
@@ -114,14 +108,33 @@ class BarrierSuite extends BaseSuite {
     runTC(prog).intercept[Throwable]
   }
 
-  // limit > 0 on construction
-  test("") {}
-  // limit > 0 on change
-  test("") {}
+  test("Cannot construct a barrier with a 0 limit") {
+    Barrier[IO](0).use_.intercept[Throwable]
+  }
 
+  test("Cannot change a limit to zero") {
+    Barrier[IO](0).use(_.limit.set(0)).intercept[Throwable]
+  }
 
   // limit expanded while enter blocked, immediate unblock
-  test("") {}
+  test("A blocked enter is immediately unblocked if the limit is expanded") {
+    val prog = Barrier[IO](3)
+      .use { barrier =>
+        barrier.enter >> barrier.enter >> barrier.enter >>
+          IO.monotonic.flatMap { start =>
+            (barrier.enter >> barrier.enter >> IO.monotonic.map(
+              _ - start
+            )).start
+              .flatMap { fiber =>
+                IO.sleep(1.second) >> barrier.limit.set(4) >>
+                  IO.sleep(1.second) >> barrier.limit.set(5) >>
+                  fiber.joinWithNever
+              }
+          }
+      }
+
+    runTC(prog).assertEquals(2.seconds)
+  }
   // limit restricted while enter blocked, no premature unblocking
   test("") {}
   // test limit changes when idle

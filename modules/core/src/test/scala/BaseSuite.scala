@@ -22,8 +22,10 @@
 package upperbound
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 import munit.{CatsEffectSuite, ScalaCheckEffectSuite}
 
 abstract class BaseSuite extends CatsEffectSuite with ScalaCheckEffectSuite {
   override val munitExecutionContext: ExecutionContext = ExecutionContext.global
+  override val munitTimeout: FiniteDuration = 10.seconds
 }
