@@ -30,9 +30,6 @@ import upperbound.internal.Timer
 import cats.effect.testkit.TestControl.{executeEmbed => runTC}
 
 class TimerSuite extends BaseSuite {
-  def newTimer(interval: FiniteDuration) =
-    Resource.eval(Timer[IO](interval))
-
   def timedSleep(timer: Timer[IO]): Resource[IO, IO[FiniteDuration]] =
     Resource.eval(IO.monotonic).flatMap { t0 =>
       val fa = timer.sleep >> IO.monotonic.map(t => t - t0)
