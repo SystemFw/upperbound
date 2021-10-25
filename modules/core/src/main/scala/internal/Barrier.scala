@@ -77,6 +77,14 @@ private[upperbound] object Barrier {
         "The number of fibers in the barrier can never go below zero"
       )
 
+    def checkLimitBounds(limit: Int): F[Unit] = {
+      val error = new IllegalStateException(
+        "The limit on fibers in the barrier must be > 0"
+      )
+
+      F.raiseError(error).whenA(limit <= 0)
+    }
+
     def wakeUp(waiting: Option[Deferred[F, Unit]]) =
       waiting.traverse_(_.complete(()))
 
@@ -87,64 +95,66 @@ private[upperbound] object Barrier {
       ).tupled
     }
 
-    resources.flatMap { case (state, limit_) =>
-      val barrier = new Barrier[F] {
-        def enter: F[Unit] =
-          F.uncancelable { poll =>
-            F.deferred[Unit].flatMap { wait =>
-              val waitForChanges = poll(wait.get).onCancel {
-                state.update(s => State(s.running, s.limit, None))
+    Resource.eval(checkLimitBounds(initialLimit)) >>
+      resources.flatMap { case (state, limit_) =>
+        val barrier = new Barrier[F] {
+          def enter: F[Unit] =
+            F.uncancelable { poll =>
+              F.deferred[Unit].flatMap { wait =>
+                val waitForChanges = poll(wait.get).onCancel {
+                  state.update(s => State(s.running, s.limit, None))
+                }
+
+                state.modify {
+                  case s @ State(_, _, Some(waiting @ _)) =>
+                    s -> F.raiseError[Unit](singleEnterViolation)
+                  case State(running, limit, None) =>
+                    if (running < limit)
+                      State(running + 1, limit, None) -> F.unit
+                    else
+                      State(
+                        running,
+                        limit,
+                        Some(wait)
+                      ) -> (waitForChanges >> enter)
+                }.flatten
               }
-
-              state.modify {
-                case s @ State(_, _, Some(waiting @ _)) =>
-                  s -> F.raiseError[Unit](singleEnterViolation)
-                case State(running, limit, None) =>
-                  if (running < limit)
-                    State(running + 1, limit, None) -> F.unit
-                  else
-                    State(
-                      running,
-                      limit,
-                      Some(wait)
-                    ) -> (waitForChanges >> enter)
-              }.flatten
             }
-          }
 
-        def exit: F[Unit] =
-          state
-            .modify { case s @ State(running, limit, waiting) =>
-              val runningNow = running - 1
-              if (runningNow < 0)
-                s -> F.raiseError[Unit](runningViolation)
-              else if (runningNow < limit)
-                State(runningNow, limit, None) -> wakeUp(waiting)
-              else State(runningNow, limit, waiting) -> F.unit
-            }
-            .flatten
-            .uncancelable
-
-        val limit = limit_
-      }
-
-      val limitChanges =
-        barrier.limit.discrete
-          .evalMap { newLimit =>
+          def exit: F[Unit] =
             state
-              .modify { case State(running, _, waiting) =>
-                if (running < newLimit)
-                  State(running, newLimit, None) -> wakeUp(waiting)
-                else State(running, newLimit, waiting) -> F.unit
+              .modify { case s @ State(running, limit, waiting) =>
+                val runningNow = running - 1
+                if (runningNow < 0)
+                  s -> F.raiseError[Unit](runningViolation)
+                else if (runningNow < limit)
+                  State(runningNow, limit, None) -> wakeUp(waiting)
+                else State(runningNow, limit, waiting) -> F.unit
               }
               .flatten
               .uncancelable
-          }
-          .compile
-          .drain
 
-      limitChanges.background.as(barrier)
-    }
+          val limit = limit_
+        }
+
+        val limitChanges =
+          barrier.limit.discrete
+            .evalMap { newLimit =>
+              checkLimitBounds(newLimit) >>
+                state
+                  .modify { case State(running, _, waiting) =>
+                    if (running < newLimit)
+                      State(running, newLimit, None) -> wakeUp(waiting)
+                    else State(running, newLimit, waiting) -> F.unit
+                  }
+                  .flatten
+                  .uncancelable
+            }
+            .compile
+            .drain
+
+        limitChanges.background.as(barrier)
+      }
   }
 
 }

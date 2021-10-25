@@ -152,8 +152,8 @@ object Limiter {
       maxQueued: Int = Int.MaxValue,
       maxConcurrent: Int = Int.MaxValue
   ): Resource[F, Limiter[F]] = {
-    assert(maxQueued > 0, s"n must be > 0, was $maxQueued")
-    assert(maxConcurrent > 0, s"n must be > 0, was $maxConcurrent")
+    assert(maxQueued > 0, s"maxQueued must be > 0, was $maxQueued")
+    assert(maxConcurrent > 0, s"maxConcurrent must be > 0, was $maxConcurrent")
 
     val F = Temporal[F]
 
