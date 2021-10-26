@@ -31,7 +31,7 @@ import scala.concurrent.duration._
 /** Resettable timer. */
 private[upperbound] trait Timer[F[_]] {
 
-  /** Obtains a snapshot of the current interval
+  /** Obtains a snapshot of the current interval.
     * May be out of date the instant after it is retrieved.
     */
   def interval: F[FiniteDuration]
@@ -44,10 +44,10 @@ private[upperbound] trait Timer[F[_]] {
 
   /** Sleeps for the duration of the current interval.
     *
-    * If the interval gets reset or updated while a sleep is
-    * happening, the duration of the sleep is adjusted on the fly,
-    * taking into account any elapsed time. This might mean waking up
-    * instantly if the entire new interval has already elapsed.
+    * If the interval changes while a sleep is happening, the duration
+    * of the sleep is adjusted on the fly, taking into account any
+    * elapsed time. This might mean waking up instantly if the entire
+    * new interval has already elapsed.
     */
   def sleep: F[Unit]
 }

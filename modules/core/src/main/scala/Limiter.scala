@@ -168,7 +168,7 @@ object Limiter {
     val resources =
       (
         Resource.eval(Queue[F, F[Unit]](maxQueued)),
-        Barrier[F](maxConcurrent),
+        Resource.eval(Barrier[F](maxConcurrent)),
         Resource.eval(Timer[F](minInterval)),
         Supervisor[F]
       ).tupled

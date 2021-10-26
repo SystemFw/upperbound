@@ -34,7 +34,7 @@ import cats.effect.testkit.TestControl.{
 
 class BarrierSuite extends BaseSuite {
   def fillBarrier(barrier: Barrier[IO]): IO[Unit] =
-    barrier.limit.get
+    barrier.limit
       .flatMap(limit => barrier.enter.replicateA(limit))
       .void
 
@@ -45,13 +45,13 @@ class BarrierSuite extends BaseSuite {
     }
 
   test("enter the barrier immediately if below the limit") {
-    val prog = Barrier[IO](10).use(_.enter)
+    val prog = Barrier[IO](10).flatMap(_.enter)
 
     runTC(prog)
   }
 
   test("enter blocks when limit is hit") {
-    val prog = Barrier[IO](2).use { barrier =>
+    val prog = Barrier[IO](2).flatMap { barrier =>
       fillBarrier(barrier) >> barrier.enter
     }
 
@@ -59,7 +59,7 @@ class BarrierSuite extends BaseSuite {
   }
 
   test("enter is unblocked by exit") {
-    val prog = Barrier[IO](1).use { barrier =>
+    val prog = Barrier[IO](1).flatMap { barrier =>
       fillBarrier(barrier) >> timedStart(barrier.enter).use { getResult =>
         IO.sleep(1.second) >> barrier.exit >> getResult
       }
@@ -70,7 +70,7 @@ class BarrierSuite extends BaseSuite {
 
   test("enter is unblocked by exit the right amount of times") {
     val prog = Barrier[IO](3)
-      .use { barrier =>
+      .flatMap { barrier =>
         fillBarrier(barrier) >>
           timedStart(barrier.enter >> barrier.enter).use { getResult =>
             IO.sleep(1.second) >>
@@ -86,7 +86,7 @@ class BarrierSuite extends BaseSuite {
 
   test("Only one fiber can block on enter at the same time") {
     val prog = Barrier[IO](1)
-      .use { barrier =>
+      .flatMap { barrier =>
         fillBarrier(barrier) >> (barrier.enter, barrier.enter).parTupled
       }
 
@@ -94,7 +94,7 @@ class BarrierSuite extends BaseSuite {
   }
 
   test("Cannot call exit without entering") {
-    val prog = Barrier[IO](5).use { barrier =>
+    val prog = Barrier[IO](5).flatMap { barrier =>
       barrier.exit >> barrier.enter
     }
 
@@ -102,7 +102,7 @@ class BarrierSuite extends BaseSuite {
   }
 
   test("Calls to exit cannot outnumber calls to enter") {
-    val prog = Barrier[IO](2).use { barrier =>
+    val prog = Barrier[IO](2).flatMap { barrier =>
       barrier.enter >> barrier.enter >> barrier.exit >> barrier.exit >> barrier.exit
     }
 
@@ -110,22 +110,22 @@ class BarrierSuite extends BaseSuite {
   }
 
   test("Cannot construct a barrier with a 0 limit") {
-    Barrier[IO](0).use_.intercept[Throwable]
+    Barrier[IO](0).intercept[Throwable]
   }
 
   test("Cannot change a limit to zero") {
-    Barrier[IO](0).use(_.limit.set(0)).intercept[Throwable]
+    Barrier[IO](0).flatMap(_.setLimit(0)).intercept[Throwable]
   }
 
   test("A blocked enter is immediately unblocked if the limit is expanded") {
     val prog = Barrier[IO](3)
-      .use { barrier =>
+      .flatMap { barrier =>
         fillBarrier(barrier) >>
           timedStart(barrier.enter >> barrier.enter).use { getResult =>
             IO.sleep(1.second) >>
-              barrier.limit.set(4) >>
+              barrier.setLimit(4) >>
               IO.sleep(1.second) >>
-              barrier.limit.set(5) >>
+              barrier.setLimit(5) >>
               getResult
           }
       }
@@ -135,10 +135,10 @@ class BarrierSuite extends BaseSuite {
 
   test("A blocked enter is not unblocked prematurely if the limit is shrunk") {
     val prog = Barrier[IO](3)
-      .use { barrier =>
+      .flatMap { barrier =>
         fillBarrier(barrier) >>
           timedStart(barrier.enter).use { getResult =>
-            barrier.limit.set(2) >>
+            barrier.setLimit(2) >>
               IO.sleep(1.second) >>
               barrier.exit >>
               getResult
@@ -148,17 +148,14 @@ class BarrierSuite extends BaseSuite {
     runTC(prog).intercept[NonTerminationException]
   }
 
-  test("Sequential limit changes".only) {
+  test("Sequential limit changes") {
     val prog = Barrier[IO](3)
-      .use { barrier =>
-        // fillBarrier(barrier) >>
-        barrier.enter >> barrier.enter >> barrier.enter >>
+      .flatMap { barrier =>
+        fillBarrier(barrier) >>
           timedStart(barrier.enter).use { _ =>
-            barrier.limit.set(5) >>
+            barrier.setLimit(5) >>
               barrier.enter >>
-              barrier.limit.set(
-                2
-              ) >> // this returns but the change hasn't propagated yet, so the rest of the code executes at limit: 5 and (incorrectly terminates)
+              barrier.setLimit(2) >>
               barrier.exit >>
               barrier.exit >>
               barrier.enter
@@ -167,26 +164,4 @@ class BarrierSuite extends BaseSuite {
 
     runTC(prog).intercept[NonTerminationException]
   }
-
-  // running idle, running: 1, limit: 3
-  // running idle, running: 2, limit: 3
-  // running idle, running: 3, limit: 3
-  // running wait, running: 3, limit: 3
-  // limit change wakeup, running: 3, limit 5
-  // running idle, running: 4, limit: 5
-  // running idle, running: 5, limit: 5
-  // exit wakeup, running: 4, limit 5
-  // exit wakeup, running: 3, limit 5
-  // running idle, running: 4, limit: 5
-
-  // test("Sequential limit changes".only) {
-  //   val prog = Barrier[IO](3)
-  //     .use { barrier =>
-  //       IO.sleep(1.second) >> barrier.limit.set(4) >> barrier.limit.set(5) >> IO
-  //         .sleep(1.second)
-  //     }
-
-  //   runTC(prog)
-  // }
-
 }

@@ -25,7 +25,6 @@ package internal
 import cats.effect._
 import cats.effect.implicits._
 import cats.syntax.all._
-import fs2.concurrent.SignallingRef
 
 /** A dynamic barrier which is meant to be used in conjunction with a
   * task executor.
@@ -34,8 +33,16 @@ import fs2.concurrent.SignallingRef
   */
 private[upperbound] trait Barrier[F[_]] {
 
-  /** Controls the current limit on running tasks. */
-  def limit: SignallingRef[F, Int]
+  /** Obtains a snapshot of the current limit.
+    * May be out of date the instant after it is retrieved.
+    */
+  def limit: F[Int]
+
+  /** Resets the current limit */
+  def setLimit(n: Int): F[Unit]
+
+  /** Updates the current limit */
+  def updateLimit(f: Int => Int): F[Unit]
 
   /** Tries to enter the barrier, semantically blocking if the number
     * of running task is at or past the limit.
@@ -46,7 +53,7 @@ private[upperbound] trait Barrier[F[_]] {
     * that are already running if the limit dynamically shrinks, so
     * for some time if might be that runningTasks > limit.
     *
-    * Fails with a ConcurrentModificatioException if two fibers block
+    * Fails with a ConcurrentModificationException if two fibers block
     * on `enter` at the same time.
     */
   def enter: F[Unit]
@@ -58,7 +65,7 @@ private[upperbound] trait Barrier[F[_]] {
   def exit: F[Unit]
 }
 private[upperbound] object Barrier {
-  def apply[F[_]: Concurrent](initialLimit: Int): Resource[F, Barrier[F]] = {
+  def apply[F[_]: Concurrent](initialLimit: Int): F[Barrier[F]] = {
     val F = Concurrent[F]
 
     case class State(
@@ -77,27 +84,17 @@ private[upperbound] object Barrier {
         "The number of fibers in the barrier can never go below zero"
       )
 
-    def checkLimitBounds(limit: Int): F[Unit] = {
-      val error = new IllegalStateException(
+    def limitViolation =
+      new IllegalArgumentException(
         "The limit on fibers in the barrier must be > 0"
       )
-
-      F.raiseError(error).whenA(limit <= 0)
-    }
 
     def wakeUp(waiting: Option[Deferred[F, Unit]]) =
       waiting.traverse_(_.complete(()))
 
-    val resources = Resource.eval {
-      (
-        F.ref(State(0, initialLimit, None)),
-        SignallingRef[F, Int](initialLimit)
-      ).tupled
-    }
-
-    Resource.eval(checkLimitBounds(initialLimit)) >>
-      resources.flatMap { case (state, limit_) =>
-        val barrier = new Barrier[F] {
+    F.raiseError(limitViolation).whenA(initialLimit <= 0) >>
+      F.ref(State(0, initialLimit, None)).map { state =>
+        new Barrier[F] {
           def enter: F[Unit] =
             F.uncancelable { poll =>
               F.deferred[Unit].flatMap { wait =>
@@ -134,26 +131,22 @@ private[upperbound] object Barrier {
               .flatten
               .uncancelable
 
-          val limit = limit_
+          def updateLimit(f: Int => Int): F[Unit] =
+            state
+              .modify { case s @ State(running, limit, waiting) =>
+                val newLimit = f(limit)
+                if (newLimit <= 0)
+                  s -> F.raiseError[Unit](limitViolation)
+                else if (running < newLimit)
+                  State(running, newLimit, None) -> wakeUp(waiting)
+                else State(running, newLimit, waiting) -> F.unit
+              }
+              .flatten
+              .uncancelable
+
+          def limit: F[Int] = state.get.map(_.limit)
+          def setLimit(n: Int): F[Unit] = updateLimit(_ => n)
         }
-
-        val limitChanges =
-          barrier.limit.discrete
-            .evalMap { newLimit =>
-              checkLimitBounds(newLimit) >>
-                state
-                  .modify { case State(running, _, waiting) =>
-                    if (running < newLimit)
-                      State(running, newLimit, None) -> wakeUp(waiting)
-                    else State(running, newLimit, waiting) -> F.unit
-                  }
-                  .flatten
-                  .uncancelable
-            }
-            .compile
-            .drain
-
-        limitChanges.background.as(barrier)
       }
   }
 
