@@ -27,7 +27,10 @@ import scala.concurrent.duration._
 
 import internal.Barrier
 
-import cats.effect.testkit.TestControl.{executeEmbed => runTC}
+import cats.effect.testkit.TestControl.{
+  executeEmbed => runTC,
+  NonTerminationException
+}
 
 class BarrierSuite extends BaseSuite {
   def fillBarrier(barrier: Barrier[IO]): IO[Unit] =
@@ -49,11 +52,10 @@ class BarrierSuite extends BaseSuite {
 
   test("enter blocks when limit is hit") {
     val prog = Barrier[IO](2).use { barrier =>
-      fillBarrier(barrier) >>
-        barrier.enter.as(true).timeoutTo(2.seconds, false.pure[IO])
+      fillBarrier(barrier) >> barrier.enter
     }
 
-    runTC(prog).assertEquals(false)
+    runTC(prog).intercept[NonTerminationException]
   }
 
   test("enter is unblocked by exit") {
@@ -115,7 +117,6 @@ class BarrierSuite extends BaseSuite {
     Barrier[IO](0).use(_.limit.set(0)).intercept[Throwable]
   }
 
-  // limit expanded while enter blocked, immediate unblock
   test("A blocked enter is immediately unblocked if the limit is expanded") {
     val prog = Barrier[IO](3)
       .use { barrier =>
@@ -131,9 +132,61 @@ class BarrierSuite extends BaseSuite {
 
     runTC(prog).assertEquals(2.seconds)
   }
-  // limit restricted while enter blocked, no premature unblocking
-  test("") {}
-  // test limit changes when idle
-  test("") {}
+
+  test("A blocked enter is not unblocked prematurely if the limit is shrunk") {
+    val prog = Barrier[IO](3)
+      .use { barrier =>
+        fillBarrier(barrier) >>
+          timedStart(barrier.enter).use { getResult =>
+            barrier.limit.set(2) >>
+              IO.sleep(1.second) >>
+              barrier.exit >>
+              getResult
+          }
+      }
+
+    runTC(prog).intercept[NonTerminationException]
+  }
+
+  test("Sequential limit changes".only) {
+    val prog = Barrier[IO](3)
+      .use { barrier =>
+        // fillBarrier(barrier) >>
+        barrier.enter >> barrier.enter >> barrier.enter >>
+          timedStart(barrier.enter).use { _ =>
+            barrier.limit.set(5) >>
+              barrier.enter >>
+              barrier.limit.set(
+                2
+              ) >> // this returns but the change hasn't propagated yet, so the rest of the code executes at limit: 5 and (incorrectly terminates)
+              barrier.exit >>
+              barrier.exit >>
+              barrier.enter
+          }
+      }
+
+    runTC(prog).intercept[NonTerminationException]
+  }
+
+  // running idle, running: 1, limit: 3
+  // running idle, running: 2, limit: 3
+  // running idle, running: 3, limit: 3
+  // running wait, running: 3, limit: 3
+  // limit change wakeup, running: 3, limit 5
+  // running idle, running: 4, limit: 5
+  // running idle, running: 5, limit: 5
+  // exit wakeup, running: 4, limit 5
+  // exit wakeup, running: 3, limit 5
+  // running idle, running: 4, limit: 5
+
+  // test("Sequential limit changes".only) {
+  //   val prog = Barrier[IO](3)
+  //     .use { barrier =>
+  //       IO.sleep(1.second) >> barrier.limit.set(4) >> barrier.limit.set(5) >> IO
+  //         .sleep(1.second)
+  //     }
+
+  //   runTC(prog)
+  // }
 
 }
