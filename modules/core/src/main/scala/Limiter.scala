@@ -26,7 +26,6 @@ import cats.syntax.all._
 import cats.effect._
 import cats.effect.implicits._
 import cats.effect.std.Supervisor
-import fs2._
 import scala.concurrent.duration._
 
 import upperbound.internal.{Queue, Task, Barrier, Timer}
@@ -200,13 +199,15 @@ object Limiter {
         def pending: F[Int] = queue.size
       }
 
-      // this only gets cancelled if the limiter needs shutting down, no
-      // interruption safety needed except canceling running fibers,
-      // which happens automatically through supervisor
+      /* this only gets cancelled if the limiter needs shutting down,
+       * no interruption safety needed except canceling running
+       * fibers, which happens automatically through supervisor
+       */
       def executor: F[Unit] = {
         def go(fa: F[Unit]): F[Unit] = {
-          // F.unit to make sure we exit the barrier even if fa is
-          // canceled before getting executed
+          /* F.unit to make sure we exit the barrier even if fa is
+           * canceled before getting executed
+           */
           val job = (F.unit >> fa).guarantee(barrier.exit)
 
           supervisor.supervise(job) >>

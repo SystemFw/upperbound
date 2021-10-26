@@ -54,20 +54,20 @@ private[upperbound] trait Timer[F[_]] {
 private[upperbound] object Timer {
   def apply[F[_]: Temporal](initialInterval: FiniteDuration) = {
     val F = Temporal[F]
-    SignallingRef[F, FiniteDuration](initialInterval).map { interval_ =>
+    SignallingRef[F, FiniteDuration](initialInterval).map { intervalState =>
       new Timer[F] {
         def interval: F[FiniteDuration] =
-          interval_.get
+          intervalState.get
 
         def setInterval(t: FiniteDuration): F[Unit] =
-          interval_.set(t)
+          intervalState.set(t)
 
         def updateInterval(f: FiniteDuration => FiniteDuration): F[Unit] =
-          interval_.update(f)
+          intervalState.update(f)
 
         def sleep: F[Unit] =
           F.monotonic.flatMap { start =>
-            interval_.discrete
+            intervalState.discrete
               .switchMap { interval =>
                 val action =
                   F.monotonic.flatMap { now =>

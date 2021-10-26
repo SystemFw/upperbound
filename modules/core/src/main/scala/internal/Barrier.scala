@@ -51,7 +51,7 @@ private[upperbound] trait Barrier[F[_]] {
     * running tasks goes beyond the new limit.
     * Note however that the Barrier does not try to interrupt tasks
     * that are already running if the limit dynamically shrinks, so
-    * for some time if might be that runningTasks > limit.
+    * for some time it might be that runningTasks > limit.
     *
     * Fails with a ConcurrentModificationException if two fibers block
     * on `enter` at the same time.

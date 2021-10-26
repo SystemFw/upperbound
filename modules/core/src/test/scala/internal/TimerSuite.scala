@@ -20,12 +20,11 @@
  */
 
 package upperbound
+package internal
 
 import cats.effect._
 import cats.syntax.all._
 import scala.concurrent.duration._
-
-import upperbound.internal.Timer
 
 import cats.effect.testkit.TestControl.{executeEmbed => runTC}
 
