@@ -48,7 +48,7 @@ class TimerSuite extends BaseSuite {
     val prog = Timer[IO](1.second).flatMap { timer =>
       (
         timedSleep(timer).use(x => x),
-        timer.interval.update(_ + 1.second),
+        timer.updateInterval(_ + 1.second),
         timedSleep(timer).use(x => x)
       ).mapN((x, _, y) => (x, y))
     }
@@ -60,7 +60,7 @@ class TimerSuite extends BaseSuite {
     val prog = Timer[IO](2.seconds).flatMap { timer =>
       timedSleep(timer).use { getResult =>
         IO.sleep(1.second) >>
-          timer.interval.set(3.seconds) >>
+          timer.setInterval(3.seconds) >>
           getResult
       }
     }
@@ -72,7 +72,7 @@ class TimerSuite extends BaseSuite {
     val prog = Timer[IO](5.seconds).flatMap { timer =>
       timedSleep(timer).use { getResult =>
         IO.sleep(1.second) >>
-          timer.interval.set(3.seconds) >>
+          timer.setInterval(3.seconds) >>
           getResult
       }
     }
@@ -84,7 +84,7 @@ class TimerSuite extends BaseSuite {
     val prog = Timer[IO](5.seconds).flatMap { timer =>
       timedSleep(timer).use { getResult =>
         IO.sleep(2.second) >>
-          timer.interval.set(1.seconds) >>
+          timer.setInterval(1.seconds) >>
           getResult
       }
     }
@@ -96,11 +96,11 @@ class TimerSuite extends BaseSuite {
     val prog = Timer[IO](10.seconds).flatMap { timer =>
       timedSleep(timer).use { getResult =>
         IO.sleep(1.second) >>
-          timer.interval.set(15.seconds) >>
+          timer.setInterval(15.seconds) >>
           IO.sleep(3.seconds) >>
-          timer.interval.set(8.seconds) >>
+          timer.setInterval(8.seconds) >>
           IO.sleep(2.seconds) >>
-          timer.interval.set(4.seconds) >>
+          timer.setInterval(4.seconds) >>
           getResult
       }
     }

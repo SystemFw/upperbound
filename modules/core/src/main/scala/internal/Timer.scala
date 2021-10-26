@@ -31,15 +31,23 @@ import scala.concurrent.duration._
 /** Resettable timer. */
 private[upperbound] trait Timer[F[_]] {
 
-  /** Controls the current interval */
-  def interval: SignallingRef[F, FiniteDuration]
+  /** Obtains a snapshot of the current interval
+    * May be out of date the instant after it is retrieved.
+    */
+  def interval: F[FiniteDuration]
+
+  /** Resets the current interval */
+  def setInterval(t: FiniteDuration): F[Unit]
+
+  /** Updates the current interval */
+  def updateInterval(f: FiniteDuration => FiniteDuration): F[Unit]
 
   /** Sleeps for the duration of the current interval.
     *
-    * If the interval gets reset while a sleep is happening, the
-    * duration of the sleep is adjusted on the fly, taking into
-    * account any elapsed time. This might mean waking up instantly if
-    * the entire new interval has already elapsed.
+    * If the interval gets reset or updated while a sleep is
+    * happening, the duration of the sleep is adjusted on the fly,
+    * taking into account any elapsed time. This might mean waking up
+    * instantly if the entire new interval has already elapsed.
     */
   def sleep: F[Unit]
 }
@@ -48,10 +56,18 @@ private[upperbound] object Timer {
     val F = Temporal[F]
     SignallingRef[F, FiniteDuration](initialInterval).map { interval_ =>
       new Timer[F] {
-        def interval: SignallingRef[F, FiniteDuration] = interval_
+        def interval: F[FiniteDuration] =
+          interval_.get
+
+        def setInterval(t: FiniteDuration): F[Unit] =
+          interval_.set(t)
+
+        def updateInterval(f: FiniteDuration => FiniteDuration): F[Unit] =
+          interval_.update(f)
+
         def sleep: F[Unit] =
           F.monotonic.flatMap { start =>
-            interval.discrete
+            interval_.discrete
               .switchMap { interval =>
                 val action =
                   F.monotonic.flatMap { now =>

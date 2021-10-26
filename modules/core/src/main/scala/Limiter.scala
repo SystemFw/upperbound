@@ -79,13 +79,13 @@ trait Limiter[F[_]] {
     */
   def pending: F[Int]
 
-  def minInterval
-  def setMinInterval
-  def updateMinInterval
+  // def minInterval
+  // def setMinInterval
+  // def updateMinInterval
 
-  def maxConcurrent
-  def setMaxConcurrent
-  def updateMaxConcurrent
+  // def maxConcurrent
+  // def setMaxConcurrent
+  // def updateMaxConcurrent
 }
 
 object Limiter {
