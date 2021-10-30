@@ -24,17 +24,68 @@ package internal
 
 import cats.effect._
 import cats.syntax.all._
+import scala.concurrent.duration._
 
-import cats.effect.testkit.TestControl.{
-  executeEmbed => runTC,
-  NonTerminationException
-}
+import cats.effect.testkit.TestControl.{executeEmbed => runTC}
+import java.util.concurrent.CancellationException
 
 class TaskSuite extends BaseSuite {
-  // executable doesn't fail
-  // awaitResult propagates result
-  // awaitResult propagates errors
-  // awaitResult propagates cancelation (if easy to test)
-  // cancel cancels executable
-  // cancel backpressures on finalisers
+
+  class MyException extends Throwable
+
+  def execute[A](task: IO[A]): IO[(IO[A], IO[Unit])] =
+    Task.create(task).flatMap { task =>
+      task.executable.start.as(task.awaitResult -> task.cancel)
+    }
+
+  def executeAndWait[A](task: IO[A]): IO[A] =
+    execute(task).flatMap(_._1)
+
+  test("The Task executable cannot fail") {
+    val prog =
+      Task
+        .create { IO.raiseError[Unit](new MyException) }
+        .flatMap(_.executable)
+
+    runTC(prog)
+  }
+
+  test("Task propagates results") {
+    val prog = executeAndWait { IO.sleep(1.second).as(42) }
+
+    runTC(prog).assertEquals(42)
+  }
+
+  test("Task propagates errors") {
+    val prog = executeAndWait { IO.raiseError[Unit](new MyException) }
+
+    runTC(prog).intercept[MyException]
+  }
+
+  test("Task propagates cancellation") {
+    val prog = executeAndWait { IO.sleep(1.second) >> IO.canceled }
+
+    /* TestControl reports cancelation and nontermination with different
+     * exceptions, a deadlock in Task.awaitResult would make this test fail
+     */
+    runTC(prog).intercept[CancellationException]
+  }
+
+  test("cancel cancels the Task executable") {
+    val prog =
+      execute { IO.never[Unit] }
+        .flatMap { case (wait, cancel) => cancel >> wait }
+
+    runTC(prog).intercept[CancellationException]
+  }
+
+  test("cancel backpressures on finalisers") {
+    val prog =
+      execute { IO.never[Unit].onCancel(IO.sleep(1.second)) }
+        .flatMap { case (_, cancel) =>
+          IO.sleep(10.millis) >> cancel.timed.map(_._1)
+        }
+
+    runTC(prog).assertEquals(1.second)
+  }
 }
