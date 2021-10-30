@@ -38,10 +38,7 @@ class BarrierSuite extends BaseSuite {
       .void
 
   def timedStart(fa: IO[_]): Resource[IO, IO[FiniteDuration]] =
-    Resource.eval(IO.monotonic).flatMap { t0 =>
-      val fa_ = fa >> IO.monotonic.map(t => t - t0)
-      Resource.make(fa_.start)(_.cancel).map(_.joinWithNever)
-    }
+    fa.timed.background.map { _.flatMap(_.embedNever).map(_._1) }
 
   test("enter the barrier immediately if below the limit") {
     val prog = Barrier[IO](10).flatMap(_.enter)

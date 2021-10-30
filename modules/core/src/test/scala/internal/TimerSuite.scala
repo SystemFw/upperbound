@@ -30,12 +30,8 @@ import cats.effect.testkit.TestControl.{executeEmbed => runTC}
 
 class TimerSuite extends BaseSuite {
   def timedSleep(timer: Timer[IO]): Resource[IO, IO[FiniteDuration]] =
-    Resource.eval(IO.monotonic).flatMap { t0 =>
-      val fa = timer.sleep >> IO.monotonic.map(t => t - t0)
-      Resource
-        .make(fa.start)(_.cancel)
-        .map(_.joinWithNever)
-    }
+    timer.sleep.timed.background
+      .map { _.flatMap(_.embedNever).map(_._1) }
 
   test("behaves like a normal clock if never reset") {
     val prog = Timer[IO](1.second).flatMap(timedSleep(_).use(x => x))

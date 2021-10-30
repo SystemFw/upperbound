@@ -218,7 +218,7 @@ object Limiter {
             ).parMapN { (next, _, _) => go(next) }.flatten
         }
 
-        // execute fhe first task immediately
+        /* execute fhe first task immediately */
         (queue.dequeue, barrier.enter).parMapN { (next, _) => go(next) }.flatten
       }
 
