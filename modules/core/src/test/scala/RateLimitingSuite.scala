@@ -21,7 +21,10 @@
 
 package upperbound
 
+import fs2._
 import cats.effect._
+import cats.syntax.all._
+import cats.effect.implicits._
 import scala.concurrent.duration._
 
 import cats.effect.testkit.TestControl
@@ -85,4 +88,41 @@ class RateLimitingSuite extends BaseSuite {
       )
     }
   }
+}
+
+object Next {
+  def mkScenario(
+      desiredInterval: FiniteDuration,
+      maxConcurrent: Int,
+      productionInterval: FiniteDuration,
+      producers: Int,
+      jobsPerProducer: Int,
+      jobCompletion: FiniteDuration,
+      samplingWindow: FiniteDuration
+  ): IO[Vector[Long]] =
+    Limiter.start[IO](desiredInterval, maxConcurrent).use { limiter =>
+      def job = IO.monotonic.flatMap { t => IO.sleep(jobCompletion).as(t) }
+
+      def producer =
+        Stream(job)
+          .repeatN(jobsPerProducer.toLong)
+          .covary[IO]
+          .meteredStartImmediately(productionInterval)
+          .mapAsyncUnordered(Int.MaxValue)(job => limiter.submit(job))
+
+      def runProducers =
+        Stream(producer)
+          .repeatN(producers.toLong)
+          .parJoinUnbounded
+          .interruptAfter(samplingWindow)
+
+      def results =
+        runProducers
+          .sliding(2)
+          .map { sample => sample(1).toMillis - sample(0).toMillis }
+          .compile
+          .toVector
+
+      results
+    }
 }
