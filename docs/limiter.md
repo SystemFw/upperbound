@@ -52,8 +52,8 @@ new limiter and starts processing jobs submitted to it.
 object Limiter {
   def start[F[_]: Temporal](
     minInterval: FiniteDuration,
-    maxQueued: Int = Int.MaxValue,
-    maxConcurrent: Int = Int.MaxValue
+    maxConcurrent: Int = Int.MaxValue,
+    maxQueued: Int = Int.MaxValue
   ): Resource[F, Limiter[F]]
 }
 ```
