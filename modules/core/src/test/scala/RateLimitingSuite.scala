@@ -23,75 +23,12 @@ package upperbound
 
 import fs2._
 import cats.effect._
-import cats.syntax.all._
-import cats.effect.implicits._
 import scala.concurrent.duration._
 
 import cats.effect.testkit.TestControl
 
 class RateLimitingSuite extends BaseSuite {
-  val samplingWindow = 10.seconds
-  import TestScenarios._
-
-  test("submit semantics should return the result of the submitted job") {
-    IO.ref(false)
-      .flatMap { complete =>
-        Limiter.start[IO](200.millis).use {
-          _.submit(complete.set(true).as("done"))
-            .product(complete.get)
-        }
-      }
-      .map { case (res, state) =>
-        assertEquals(res, "done")
-        assertEquals(state, true)
-      }
-  }
-
-  test("submit semantics should report errors of a failed task") {
-    case class MyError() extends Exception
-    Limiter
-      .start[IO](200.millis)
-      .use {
-        _.submit(IO.raiseError[Int](new MyError))
-      }
-      .intercept[MyError]
-  }
-
-  test("multiple fast producers, fast non-failing jobs") {
-    val conditions = TestingConditions(
-      desiredInterval = 200.millis,
-      productionInterval = 1.millis,
-      producers = 4,
-      jobsPerProducer = 100,
-      jobCompletion = 0.seconds,
-      samplingWindow = samplingWindow
-    )
-
-    TestControl.executeEmbed(mkScenario[IO](conditions)).map { r =>
-      assert(r.jobExecutionMetrics.diffs.forall(_ == 200L))
-    }
-  }
-
-  test("slow producer, no unnecessary delays") {
-    val conditions = TestingConditions(
-      desiredInterval = 200.millis,
-      productionInterval = 300.millis,
-      producers = 1,
-      jobsPerProducer = 100,
-      jobCompletion = 0.seconds,
-      samplingWindow = samplingWindow
-    )
-
-    TestControl.executeEmbed(mkScenario[IO](conditions)).map { r =>
-      assert(
-        r.jobExecutionMetrics.diffs.forall(_ == 300L)
-      )
-    }
-  }
-}
-
-object Next {
-  def mkScenario(
+  def simulation(
       desiredInterval: FiniteDuration,
       maxConcurrent: Int,
       productionInterval: FiniteDuration,
@@ -125,4 +62,56 @@ object Next {
 
       results
     }
+
+  test("submit semantics should return the result of the submitted job") {
+    IO.ref(false)
+      .flatMap { complete =>
+        Limiter.start[IO](200.millis).use {
+          _.submit(complete.set(true).as("done"))
+            .product(complete.get)
+        }
+      }
+      .map { case (res, state) =>
+        assertEquals(res, "done")
+        assertEquals(state, true)
+      }
+  }
+
+  test("submit semantics should report errors of a failed task") {
+    case class MyError() extends Exception
+    Limiter
+      .start[IO](200.millis)
+      .use {
+        _.submit(IO.raiseError[Int](new MyError))
+      }
+      .intercept[MyError]
+  }
+
+  test("multiple fast producers, fast non-failing jobs") {
+    val prog = simulation(
+      desiredInterval = 200.millis,
+      maxConcurrent = Int.MaxValue,
+      productionInterval = 1.millis,
+      producers = 4,
+      jobsPerProducer = 100,
+      jobCompletion = 0.seconds,
+      samplingWindow = 10.seconds
+    )
+
+    TestControl.executeEmbed(prog).map { r => assert(r.forall(_ == 200L)) }
+  }
+
+  test("slow producer, no unnecessary delays") {
+    val prog = simulation(
+      desiredInterval = 200.millis,
+      maxConcurrent = Int.MaxValue,
+      productionInterval = 300.millis,
+      producers = 1,
+      jobsPerProducer = 100,
+      jobCompletion = 0.seconds,
+      samplingWindow = 10.seconds
+    )
+
+    TestControl.executeEmbed(prog).map { r => assert(r.forall(_ == 300L)) }
+  }
 }
