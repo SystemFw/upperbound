@@ -15,7 +15,7 @@ ThisBuild / licenses := List(("MIT", url("http://opensource.org/licenses/MIT")))
 ThisBuild / startYear := Some(2017)
 Global / excludeLintKeys += scmInfo
 
-val Scala213 = "2.13.6"
+val Scala213 = "2.13.7"
 ThisBuild / spiewakMainBranches := Seq("main")
 
 ThisBuild / crossScalaVersions := Seq(Scala213, "3.0.0", "2.12.14")
