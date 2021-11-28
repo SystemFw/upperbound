@@ -50,7 +50,7 @@ lazy val core = project
     name := "upperbound",
     scalafmtOnCompile := true,
     libraryDependencies ++=
-      dep("org.typelevel", "cats-", "2.6.1")("core")() ++
+      dep("org.typelevel", "cats-", "2.7.0")("core")() ++
       dep("org.typelevel", "cats-effect", "3.3-162-2022ef9")("")("-laws", "-testkit") ++
       dep("co.fs2", "fs2-", "3.1.3")("core")() ++
       dep("org.scalameta", "munit", "0.7.29")()("", "-scalacheck") ++
