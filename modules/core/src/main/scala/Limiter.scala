@@ -78,13 +78,13 @@ trait Limiter[F[_]] {
     */
   def pending: F[Int]
 
-  // def minInterval
-  // def setMinInterval
-  // def updateMinInterval
+  def minInterval: F[FiniteDuration]
+  def setMinInterval(newMinInterval: FiniteDuration): F[Unit]
+  def updateMinInterval(update: FiniteDuration => FiniteDuration): F[Unit]
 
-  // def maxConcurrent
-  // def setMaxConcurrent
-  // def updateMaxConcurrent
+  def maxConcurrent: F[Int]
+  def setMaxConcurrent(newMaxConcurrent: Int): F[Unit]
+  def updateMaxConcurrent(update: Int => Int): F[Unit]
 }
 
 object Limiter {
@@ -172,9 +172,6 @@ object Limiter {
         Supervisor[F]
       ).tupled
 
-    // TODO remove
-    def p(s: String) = F.unit.map(_ => println(s))
-
     resources.flatMap { case (queue, barrier, timer, supervisor) =>
       val limiter = new Limiter[F] {
         def submit[A](
@@ -197,6 +194,22 @@ object Limiter {
         }
 
         def pending: F[Int] = queue.size
+
+        def minInterval: F[FiniteDuration] =
+          timer.interval
+        def setMinInterval(newMinInterval: FiniteDuration): F[Unit] =
+          timer.setInterval(newMinInterval)
+        def updateMinInterval(
+            update: FiniteDuration => FiniteDuration
+        ): F[Unit] =
+          timer.updateInterval(update)
+
+        def maxConcurrent: F[Int] =
+          barrier.limit
+        def setMaxConcurrent(newMaxConcurrent: Int): F[Unit] =
+          barrier.setLimit(newMaxConcurrent)
+        def updateMaxConcurrent(update: Int => Int): F[Unit] =
+          barrier.updateLimit(update)
       }
 
       /* this only gets cancelled if the limiter needs shutting down,
@@ -223,21 +236,6 @@ object Limiter {
       }
 
       executor.background.as(limiter)
-
-    // we want a fixed delay rather than fixed rate, so that when
-    // waking up after waiting for `maxConcurrent` to lower, there are
-    // no bursts
-    // val executor: Stream[F, Unit] =
-    //   queue.dequeueAll
-    //     .zipLeft(Stream.fixedDelay(minInterval))
-    //     .mapAsyncUnordered(maxConcurrent)(task => task)
-
-    // Stream
-    //   .emit(limiter)
-    //   .concurrently(executor)
-    //   .compile
-    //   .resource
-    //   .lastOrError
     }
   }
 
@@ -249,5 +247,12 @@ object Limiter {
     new Limiter[F] {
       def submit[A](job: F[A], priority: Int): F[A] = job
       def pending: F[Int] = 0.pure[F]
+      def maxConcurrent: F[Int] = Int.MaxValue.pure[F]
+      def minInterval: F[FiniteDuration] = 0.seconds.pure[F]
+      def setMaxConcurrent(newMaxConcurrent: Int): F[Unit] = ().pure[F]
+      def setMinInterval(newMinInterval: FiniteDuration): F[Unit] = ().pure[F]
+      def updateMaxConcurrent(update: Int => Int): F[Unit] = ().pure[F]
+      def updateMinInterval(update: FiniteDuration => FiniteDuration): F[Unit] =
+        ().pure[F]
     }
 }
