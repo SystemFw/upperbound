@@ -78,8 +78,29 @@ trait Limiter[F[_]] {
     */
   def pending: F[Int]
 
+  /** Obtains a snapshot of the current interval.
+    *
+    * May be out of date the instant after it is retrieved if a call
+    * to `setMinInterval`. or `updateMinInterval` happens.
+    */
   def minInterval: F[FiniteDuration]
+
+  /** Resets the current interval.
+    *
+    * If the interval changes while the Limiter is sleeping between
+    * tasks, the duration of the sleep is adjusted on the fly, taking
+    * into account any elapsed time. This might mean waking up
+    * instantly if the entire new interval has already elapsed.
+    */
   def setMinInterval(newMinInterval: FiniteDuration): F[Unit]
+
+  /** Updates the current interval.
+    *
+    * If the interval changes while the Limiter is sleeping between
+    * tasks, the duration of the sleep is adjusted on the fly, taking
+    * into account any elapsed time. This might mean waking up
+    * instantly if the entire new interval has already elapsed.
+    */
   def updateMinInterval(update: FiniteDuration => FiniteDuration): F[Unit]
 
   def maxConcurrent: F[Int]
