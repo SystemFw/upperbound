@@ -103,8 +103,37 @@ trait Limiter[F[_]] {
     */
   def updateMinInterval(update: FiniteDuration => FiniteDuration): F[Unit]
 
+  /** Obtains a snapshot of the current concurrency limit.
+    *
+    * May be out of date the instant after it is retrieved if a call
+    * to `setMaxConcurrent` or `updateMaxConcurrent` happens.
+    */
   def maxConcurrent: F[Int]
+
+  /** Resets the task concurrency limit.
+    *
+    * If `maxConcurrent` gets changed while the Limiter is already
+    * blocked waiting for some tasks to finish, the Limiter will then
+    * be unblocked as soon as the number of running tasks goes below
+    * `newMaxConcurrent`.
+    *
+    * Note however that if the concurrency limit shrinks the Limiter
+    * will not try to interrupt tasks that are already running, so for
+    * some time it might be that `runningTasks > maxConcurrent`.
+    */
   def setMaxConcurrent(newMaxConcurrent: Int): F[Unit]
+
+  /** Updates the task concurrency limit.
+    *
+    * If `maxConcurrent` gets changed while the Limiter is already
+    * blocked waiting for some tasks to finish, the Limiter will then
+    * be unblocked as soon as the number of running tasks goes below
+    * `newMaxConcurrent`.
+    *
+    * Note however that if the concurrency limit shrinks the Limiter
+    * will not try to interrupt tasks that are already running, so for
+    * some time it might be that `runningTasks > maxConcurrent`.
+    */
   def updateMaxConcurrent(update: Int => Int): F[Unit]
 }
 

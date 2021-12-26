@@ -48,7 +48,7 @@ private[upperbound] trait Barrier[F[_]] {
     * of running task is at or past the limit.
     * The limit can change dynamically while `enter` is blocked, in
     * which case `enter` will be unblocked as soon as the number of
-    * running tasks goes beyond the new limit.
+    * running tasks goes below the new limit.
     * Note however that the Barrier does not try to interrupt tasks
     * that are already running if the limit dynamically shrinks, so
     * for some time it might be that runningTasks > limit.
