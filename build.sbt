@@ -74,8 +74,6 @@ lazy val docs = project
   .dependsOn(core)
   .enablePlugins(MdocPlugin, NoPublishPlugin)
 
-ThisBuild / githubWorkflowJavaVersions := Seq("adopt@1.11.0-11")
-
 ThisBuild / githubWorkflowBuildPostamble ++= List(
   WorkflowStep.Sbt(
     List("docs/mdoc"),
