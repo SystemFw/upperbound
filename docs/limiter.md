@@ -174,13 +174,46 @@ limiter.use { limiter =>
 ```
 
 If you struggled to make sense of the examples in this section, it's
-recommended to watch [this
-talk](https://github.com/SystemFw/scala-italy-2018).
+recommended to watch [this talk](https://github.com/SystemFw/scala-italy-2018.)
 
+## Adjusting rate and concurrency
+
+**upperbound** lets you control both the rate of submission and the
+maximum concurrency dynamically, through the following methods on
+`Limiter`:
+
+```scala
+def minInterval: F[FiniteDuration]
+def setMinInterval(newMinInterval: FiniteDuration): F[Unit]
+def updateMinInterval(update: FiniteDuration => FiniteDuration): F[Unit]
+
+def maxConcurrent: F[Int]
+def setMaxConcurrent(newMaxConcurrent: Int): F[Unit]
+def updateMaxConcurrent(update: Int => Int): F[Unit]
+```
+
+The `*minInterval` methods let you change the rate of submission by
+varying the minimum time interval between two tasks. If the interval
+changes while the limiter is sleeping between tasks, the duration of
+the sleep is adjusted on the fly, taking into account any elapsed
+time. This might mean waking up instantly if the entire new interval
+has already elapsed.
+
+The `*maxConcurrent` methods let you change the maximum number of
+concurrent tasks that can be executing at any given time. If the
+concurrency limit gets changed while the limiter is already blocked
+waiting for some tasks to finish, the limiter will then be unblocked
+as soon as the number of running tasks goes below the new concurrency
+limit. Note however that if the limit shrinks the limiter will not try to
+interrupt tasks that are already running, so for some time it might be
+that `runningTasks > maxConcurrent`.
+  
+    
 ## Test limiter
 
 **upperbound** also provides `Limiter.noOp` for testing purposes, which is
 a stub `Limiter` with no actual rate limiting and a synchronous
 `submit` method.
+
 
 
