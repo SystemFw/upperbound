@@ -43,11 +43,12 @@ private[upperbound] case class Task[F[_]: Concurrent, A](
     */
   def executable: F[Unit] =
     F.uncancelable { poll =>
-      // `poll(..).onCancel` handles direct cancelation of `executable`,
-      // which happens when Limiter itself gets shutdown.
-      //
-      // `racePair(..).flatMap` propagates cancelation triggered by
-      // `cancel`from the client to `executable`.
+      /* `poll(..).onCancel` handles direct cancelation of `executable`,
+       * which happens when Limiter itself gets shutdown.
+       *
+       * `racePair(..).flatMap` propagates cancelation triggered by
+       * `cancel`from the client to `executable`.
+       */
       poll(F.racePair(task, stopSignal.get))
         .onCancel(result.complete(Outcome.canceled).void)
         .flatMap {

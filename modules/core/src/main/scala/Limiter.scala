@@ -24,11 +24,11 @@ package upperbound
 import cats._
 import cats.syntax.all._
 import cats.effect._
-import cats.effect.syntax.all._
-import fs2._
+import cats.effect.implicits._
+import cats.effect.std.Supervisor
 import scala.concurrent.duration._
 
-import upperbound.internal.{Queue, Task}
+import upperbound.internal.{Queue, Task, Barrier, Timer}
 
 /** A purely functional, interval based rate limiter.
   */
@@ -77,6 +77,64 @@ trait Limiter[F[_]] {
     * retrieved.
     */
   def pending: F[Int]
+
+  /** Obtains a snapshot of the current interval.
+    *
+    * May be out of date the instant after it is retrieved if a call
+    * to `setMinInterval`. or `updateMinInterval` happens.
+    */
+  def minInterval: F[FiniteDuration]
+
+  /** Resets the current interval.
+    *
+    * If the interval changes while the Limiter is sleeping between
+    * tasks, the duration of the sleep is adjusted on the fly, taking
+    * into account any elapsed time. This might mean waking up
+    * instantly if the entire new interval has already elapsed.
+    */
+  def setMinInterval(newMinInterval: FiniteDuration): F[Unit]
+
+  /** Updates the current interval.
+    *
+    * If the interval changes while the Limiter is sleeping between
+    * tasks, the duration of the sleep is adjusted on the fly, taking
+    * into account any elapsed time. This might mean waking up
+    * instantly if the entire new interval has already elapsed.
+    */
+  def updateMinInterval(update: FiniteDuration => FiniteDuration): F[Unit]
+
+  /** Obtains a snapshot of the current concurrency limit.
+    *
+    * May be out of date the instant after it is retrieved if a call
+    * to `setMaxConcurrent` or `updateMaxConcurrent` happens.
+    */
+  def maxConcurrent: F[Int]
+
+  /** Resets the task concurrency limit.
+    *
+    * If `maxConcurrent` gets changed while the Limiter is already
+    * blocked waiting for some tasks to finish, the Limiter will then
+    * be unblocked as soon as the number of running tasks goes below
+    * `newMaxConcurrent`.
+    *
+    * Note however that if the concurrency limit shrinks the Limiter
+    * will not try to interrupt tasks that are already running, so for
+    * some time it might be that `runningTasks > maxConcurrent`.
+    */
+  def setMaxConcurrent(newMaxConcurrent: Int): F[Unit]
+
+  /** Updates the task concurrency limit.
+    *
+    * If `maxConcurrent` gets changed while the Limiter is already
+    * blocked waiting for some tasks to finish, the Limiter will then
+    * be unblocked as soon as the number of running tasks goes below
+    * `newMaxConcurrent`.
+    *
+    * Note however that if the concurrency limit shrinks the Limiter
+    * will not try to interrupt tasks that are already running, so for
+    * some time it might be that `runningTasks > maxConcurrent`.
+    */
+  def updateMaxConcurrent(update: Int => Int): F[Unit]
 }
 
 object Limiter {
@@ -148,18 +206,28 @@ object Limiter {
     */
   def start[F[_]: Temporal](
       minInterval: FiniteDuration,
-      maxQueued: Int = Int.MaxValue,
-      maxConcurrent: Int = Int.MaxValue
+      maxConcurrent: Int = Int.MaxValue,
+      maxQueued: Int = Int.MaxValue
   ): Resource[F, Limiter[F]] = {
-    assert(maxQueued > 0, s"n must be > 0, was $maxQueued")
-    assert(maxConcurrent > 0, s"n must be > 0, was $maxConcurrent")
+    assert(maxQueued > 0, s"maxQueued must be > 0, was $maxQueued")
+    assert(maxConcurrent > 0, s"maxConcurrent must be > 0, was $maxConcurrent")
 
-    Resource.eval(Queue[F, F[Unit]](maxQueued)).flatMap { queue =>
+    val F = Temporal[F]
+
+    val resources =
+      (
+        Resource.eval(Queue[F, F[Unit]](maxQueued)),
+        Resource.eval(Barrier[F](maxConcurrent)),
+        Resource.eval(Timer[F](minInterval)),
+        Supervisor[F]
+      ).tupled
+
+    resources.flatMap { case (queue, barrier, timer, supervisor) =>
       val limiter = new Limiter[F] {
         def submit[A](
             job: F[A],
             priority: Int = 0
-        ): F[A] =
+        ): F[A] = F.uncancelable { poll =>
           Task.create(job).flatMap { task =>
             queue
               .enqueue(task.executable, priority)
@@ -170,27 +238,54 @@ object Limiter {
                     task.cancel.whenA(!deleted)
                   }
 
-                task.awaitResult.onCancel(propagateCancelation)
+                poll(task.awaitResult).onCancel(propagateCancelation)
               }
           }
+        }
 
         def pending: F[Int] = queue.size
+
+        def minInterval: F[FiniteDuration] =
+          timer.interval
+        def setMinInterval(newMinInterval: FiniteDuration): F[Unit] =
+          timer.setInterval(newMinInterval)
+        def updateMinInterval(
+            update: FiniteDuration => FiniteDuration
+        ): F[Unit] =
+          timer.updateInterval(update)
+
+        def maxConcurrent: F[Int] =
+          barrier.limit
+        def setMaxConcurrent(newMaxConcurrent: Int): F[Unit] =
+          barrier.setLimit(newMaxConcurrent)
+        def updateMaxConcurrent(update: Int => Int): F[Unit] =
+          barrier.updateLimit(update)
       }
 
-      // we want a fixed delay rather than fixed rate, so that when
-      // waking up after waiting for `maxConcurrent` to lower, there are
-      // no bursts
-      val executor: Stream[F, Unit] =
-        queue.dequeueAll
-          .zipLeft(Stream.fixedDelay(minInterval))
-          .mapAsyncUnordered(maxConcurrent)(task => task)
+      /* this only gets cancelled if the limiter needs shutting down,
+       * no interruption safety needed except canceling running
+       * fibers, which happens automatically through supervisor
+       */
+      def executor: F[Unit] = {
+        def go(fa: F[Unit]): F[Unit] = {
+          /* F.unit to make sure we exit the barrier even if fa is
+           * canceled before getting executed
+           */
+          val job = (F.unit >> fa).guarantee(barrier.exit)
 
-      Stream
-        .emit(limiter)
-        .concurrently(executor)
-        .compile
-        .resource
-        .lastOrError
+          supervisor.supervise(job) >>
+            (
+              queue.dequeue,
+              barrier.enter,
+              timer.sleep
+            ).parMapN { (next, _, _) => go(next) }.flatten
+        }
+
+        /* execute fhe first task immediately */
+        (queue.dequeue, barrier.enter).parMapN { (next, _) => go(next) }.flatten
+      }
+
+      executor.background.as(limiter)
     }
   }
 
@@ -202,5 +297,12 @@ object Limiter {
     new Limiter[F] {
       def submit[A](job: F[A], priority: Int): F[A] = job
       def pending: F[Int] = 0.pure[F]
+      def maxConcurrent: F[Int] = Int.MaxValue.pure[F]
+      def minInterval: F[FiniteDuration] = 0.seconds.pure[F]
+      def setMaxConcurrent(newMaxConcurrent: Int): F[Unit] = ().pure[F]
+      def setMinInterval(newMinInterval: FiniteDuration): F[Unit] = ().pure[F]
+      def updateMaxConcurrent(update: Int => Int): F[Unit] = ().pure[F]
+      def updateMinInterval(update: FiniteDuration => FiniteDuration): F[Unit] =
+        ().pure[F]
     }
 }
