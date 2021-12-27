@@ -29,7 +29,7 @@ import scala.concurrent.duration._
 import cats.effect.testkit.TestControl.{executeEmbed => runTC}
 
 class TimerSuite extends BaseSuite {
-  def timedSleep(timer: Timer[IO]): Resource[IO, IO[FiniteDuration]] =
+  private def timedSleep(timer: Timer[IO]): Resource[IO, IO[FiniteDuration]] =
     timer.sleep.timed.background
       .map { _.flatMap(_.embedNever).map(_._1) }
 

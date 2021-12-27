@@ -32,7 +32,7 @@ import cats.effect.testkit.TestControl.{
 }
 
 class BarrierSuite extends BaseSuite {
-  def fillBarrier(barrier: Barrier[IO]): IO[Unit] =
+  private def fillBarrier(barrier: Barrier[IO]): IO[Unit] =
     barrier.limit
       .flatMap(limit => barrier.enter.replicateA(limit))
       .void
