@@ -4,7 +4,7 @@
 
 - Interval-based design to prevent bursts
 - Prioritised jobs
-- Controls both rate and concurrency
+- Dynamic controls over both rate and concurrency
 
 [Getting started](installing.md)
 

@@ -29,6 +29,9 @@ import fs2._
 
 import cats.effect.std.PQueue
 
+/** A concurrent priority queue with support for deletion.
+  * Reads block on empty queue, writes fail on full queue.
+  */
 private[upperbound] trait Queue[F[_], A] {
   type Id
 

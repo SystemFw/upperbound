@@ -20,13 +20,12 @@
  */
 
 package upperbound
+package internal
 
 import fs2.Stream
 import cats.effect._
 import cats.syntax.all._
 import scala.concurrent.duration._
-
-import upperbound.internal.Queue
 
 import org.scalacheck.effect.PropF.forAllF
 import cats.effect.testkit.TestControl

@@ -18,10 +18,8 @@ Global / excludeLintKeys += scmInfo
 val Scala213 = "2.13.6"
 ThisBuild / spiewakMainBranches := Seq("main")
 
-ThisBuild / crossScalaVersions := Seq(Scala213, "3.0.0", "2.12.14")
-ThisBuild / versionIntroduced := Map("3.0.0" -> "0.4.0")
+ThisBuild / crossScalaVersions := Seq(Scala213, "3.1.0", "2.12.14")
 ThisBuild / scalaVersion := (ThisBuild / crossScalaVersions).value.head
-Global / excludeLintKeys += versionIntroduced
 ThisBuild / initialCommands := """
   |import cats._, data._, syntax.all._
   |import cats.effect._, concurrent._
@@ -34,6 +32,7 @@ ThisBuild / initialCommands := """
 """.stripMargin
 
 ThisBuild / testFrameworks += new TestFramework("munit.Framework")
+ThisBuild / Test / parallelExecution := false
 
 def dep(org: String, prefix: String, version: String)(modules: String*)(testModules: String*) =
   modules.map(m => org %% (prefix ++ m) % version) ++
@@ -50,12 +49,12 @@ lazy val core = project
     name := "upperbound",
     scalafmtOnCompile := true,
     libraryDependencies ++=
-      dep("org.typelevel", "cats-", "2.6.1")("core")() ++
-      dep("org.typelevel", "cats-effect", "3.3-162-2022ef9")("")("-laws", "-testkit") ++
-      dep("co.fs2", "fs2-", "3.1.3")("core")() ++
+      dep("org.typelevel", "cats-", "2.7.0")("core")() ++
+      dep("org.typelevel", "cats-effect", "3.3.1")("")("-laws", "-testkit") ++
+      dep("co.fs2", "fs2-", "3.2.4")("core")() ++
       dep("org.scalameta", "munit", "0.7.29")()("", "-scalacheck") ++
-      dep("org.typelevel", "", "1.0.5")()("munit-cats-effect-3") ++
-      dep("org.typelevel",  "scalacheck-effect", "1.0.2")()("", "-munit")
+      dep("org.typelevel", "", "1.0.7")()("munit-cats-effect-3") ++
+      dep("org.typelevel",  "scalacheck-effect", "1.0.3")()("", "-munit")
   )
 
 lazy val docs = project
@@ -74,8 +73,6 @@ lazy val docs = project
   )
   .dependsOn(core)
   .enablePlugins(MdocPlugin, NoPublishPlugin)
-
-ThisBuild / githubWorkflowJavaVersions := Seq("adopt@1.11.0-11")
 
 ThisBuild / githubWorkflowBuildPostamble ++= List(
   WorkflowStep.Sbt(
