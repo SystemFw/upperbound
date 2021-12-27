@@ -10,6 +10,7 @@ It's intended as a simple, minimal library, but with enough control to
 be broadly applicable, including:
 - Job execution rate
 - Maximum concurrency of jobs
+- Dynamically adjustable rate and concurrency
 - Prioritisation of jobs
 
 **upperbound** is a purely functional library, built on top of
