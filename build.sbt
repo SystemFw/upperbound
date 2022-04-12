@@ -18,7 +18,7 @@ Global / excludeLintKeys += scmInfo
 val Scala213 = "2.13.6"
 ThisBuild / spiewakMainBranches := Seq("main")
 
-ThisBuild / crossScalaVersions := Seq(Scala213, "3.1.0", "2.12.14")
+ThisBuild / crossScalaVersions := Seq(Scala213, "3.1.2", "2.12.14")
 ThisBuild / scalaVersion := (ThisBuild / crossScalaVersions).value.head
 ThisBuild / initialCommands := """
   |import cats._, data._, syntax.all._
