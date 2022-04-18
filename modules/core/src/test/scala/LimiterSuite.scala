@@ -27,7 +27,7 @@ import scala.concurrent.duration._
 
 import cats.effect.testkit.TestControl
 
-class RateLimitingSuite extends BaseSuite {
+class LimiterSuite extends BaseSuite {
   def simulation(
       desiredInterval: FiniteDuration,
       maxConcurrent: Int,
