@@ -121,5 +121,30 @@ class QueueSuite extends BaseSuite {
       }
       .assertEquals(2 -> None)
   }
-  // check that is never the case that delete returns true but the element gets dequeued?
+
+  // This test uses real concurrency to maximise racing
+  test("Delete returns true <-> element is marked as deleted") {
+    // Number of iterations to make potential races repeatable
+    val n = 1000
+
+    def prog(q: Queue[IO, Int]) =
+      q.enqueue(1).flatMap { id =>
+        q.enqueue(2) >>
+          (
+            q.delete(id),
+            q.dequeue
+          ).parTupled
+      }
+
+    Queue[IO, Int]()
+      .flatMap(prog)
+      .replicateA(n)
+      .map { results =>
+        results.forall { case (deleted, elem) =>
+          if (deleted) elem == 2
+          else elem == 1
+        }
+      }
+      .assert
+  }
 }
