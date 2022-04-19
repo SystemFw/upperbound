@@ -114,4 +114,26 @@ class LimiterSuite extends BaseSuite {
 
     TestControl.executeEmbed(prog).map { r => assert(r.forall(_ == 300L)) }
   }
+
+  test("maximum concurrency") {
+    val prog = simulation(
+      desiredInterval = 50.millis,
+      maxConcurrent = 3,
+      productionInterval = 1.millis,
+      producers = 1,
+      jobsPerProducer = 10,
+      jobCompletion = 300.millis,
+      samplingWindow = 10.seconds
+    )
+
+    val expected = Vector(
+      50L, 50, 200, 50, 50, 200, 50, 50, 200
+    )
+
+    TestControl.executeEmbed(prog).assertEquals(expected)
+  }
+
+  test("descheduling job, interval unaffected") {}
+  test("cancelling job, interval slot gets taken") {}
+  // first task immediatelY?
 }
