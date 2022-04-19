@@ -26,15 +26,14 @@ import cats.effect._
 import cats.effect.implicits._
 import cats.syntax.all._
 
-/** A dynamic barrier which is meant to be used in conjunction with a
-  * task executor.
-  * As such, it assumes there is only a single fiber entering the
+/** A dynamic barrier which is meant to be used in conjunction with a task
+  * executor. As such, it assumes there is only a single fiber entering the
   * barrier (the executor), but multiple ones exiting it (the tasks).
   */
 private[upperbound] trait Barrier[F[_]] {
 
-  /** Obtains a snapshot of the current limit.
-    * May be out of date the instant after it is retrieved.
+  /** Obtains a snapshot of the current limit. May be out of date the instant
+    * after it is retrieved.
     */
   def limit: F[Int]
 
@@ -44,23 +43,22 @@ private[upperbound] trait Barrier[F[_]] {
   /** Updates the current limit */
   def updateLimit(f: Int => Int): F[Unit]
 
-  /** Tries to enter the barrier, semantically blocking if the number
-    * of running task is at or past the limit.
-    * The limit can change dynamically while `enter` is blocked, in
-    * which case `enter` will be unblocked as soon as the number of
-    * running tasks goes below the new limit.
-    * Note however that the Barrier does not try to interrupt tasks
-    * that are already running if the limit dynamically shrinks, so
-    * for some time it might be that runningTasks > limit.
+  /** Tries to enter the barrier, semantically blocking if the number of running
+    * task is at or past the limit. The limit can change dynamically while
+    * `enter` is blocked, in which case `enter` will be unblocked as soon as the
+    * number of running tasks goes below the new limit. Note however that the
+    * Barrier does not try to interrupt tasks that are already running if the
+    * limit dynamically shrinks, so for some time it might be that runningTasks
+    * > limit.
     *
-    * Fails with a ConcurrentModificationException if two fibers block
-    * on `enter` at the same time.
+    * Fails with a ConcurrentModificationException if two fibers block on
+    * `enter` at the same time.
     */
   def enter: F[Unit]
 
-  /** Called by tasks when exiting the barrier, and will unblock
-    * `enter` when the number of running tasks goes beyond the limit.
-    * Can be called concurrently.
+  /** Called by tasks when exiting the barrier, and will unblock `enter` when
+    * the number of running tasks goes beyond the limit. Can be called
+    * concurrently.
     */
   def exit: F[Unit]
 }

@@ -36,33 +36,29 @@ trait Limiter[F[_]] {
 
   /** Submits `job` to the [[Limiter]] and waits until a result is available.
     *
-    * `submit` is designed to be called concurrently: every call submits a
-    * job, and they are started at regular intervals up to a maximum
-    * number of concurrent jobs, based on the parameters you specify when
-    * creating the [[Limiter]].
+    * `submit` is designed to be called concurrently: every call submits a job,
+    * and they are started at regular intervals up to a maximum number of
+    * concurrent jobs, based on the parameters you specify when creating the
+    * [[Limiter]].
     *
-    * In case of failure, the returned `F[A]` will fail with the same
-    * error `job` failed with. Note that in **upperbound** no errors
-    * are thrown if a job is rate limited, it simply waits to be
-    * executed in a queue.
-    * `submit` can however fail with a [[LimitReachedException]] if
-    * the number of enqueued jobs is past the limit you specify when
-    * creating the [[Limiter]].
+    * In case of failure, the returned `F[A]` will fail with the same error
+    * `job` failed with. Note that in **upperbound** no errors are thrown if a
+    * job is rate limited, it simply waits to be executed in a queue. `submit`
+    * can however fail with a [[LimitReachedException]] if the number of
+    * enqueued jobs is past the limit you specify when creating the [[Limiter]].
     *
-    * Cancelation semantics are respected, and cancelling the returned
-    * `F[A]` will also cancel the execution of `job`.
-    * Two scenarios are possible: if cancelation is triggered whilst `job`
-    * is still queued up for execution, `job` will never be executed and the
-    * rate of the [[Limiter]] won't be affected.
-    * If instead cancelation is triggered while `job` is running, `job`
-    * will be interrupted, but that slot will be considered used and the
+    * Cancelation semantics are respected, and cancelling the returned `F[A]`
+    * will also cancel the execution of `job`. Two scenarios are possible: if
+    * cancelation is triggered whilst `job` is still queued up for execution,
+    * `job` will never be executed and the rate of the [[Limiter]] won't be
+    * affected. If instead cancelation is triggered while `job` is running,
+    * `job` will be interrupted, but that slot will be considered used and the
     * next job will only be executed after the required time interval has
     * elapsed.
     *
     * The `priority` parameter allows you to submit jobs at different
-    * priorities, so that higher priority jobs can be executed before
-    * lower priority ones.
-    * A higher number means a higher priority. The default is 0.
+    * priorities, so that higher priority jobs can be executed before lower
+    * priority ones. A higher number means a higher priority. The default is 0.
     *
     * Note that any blocking performed by this method is only semantic, no
     * actual threads are blocked by the implementation.
@@ -72,75 +68,72 @@ trait Limiter[F[_]] {
       priority: Int = 0
   ): F[A]
 
-  /** Obtains a snapshot of the current number of jobs waiting to be
-    * executed. May be out of date the instant after it is
-    * retrieved.
+  /** Obtains a snapshot of the current number of jobs waiting to be executed.
+    * May be out of date the instant after it is retrieved.
     */
   def pending: F[Int]
 
   /** Obtains a snapshot of the current interval.
     *
-    * May be out of date the instant after it is retrieved if a call
-    * to `setMinInterval`. or `updateMinInterval` happens.
+    * May be out of date the instant after it is retrieved if a call to
+    * `setMinInterval`. or `updateMinInterval` happens.
     */
   def minInterval: F[FiniteDuration]
 
   /** Resets the current interval.
     *
-    * If the interval changes while the Limiter is sleeping between
-    * tasks, the duration of the sleep is adjusted on the fly, taking
-    * into account any elapsed time. This might mean waking up
-    * instantly if the entire new interval has already elapsed.
+    * If the interval changes while the Limiter is sleeping between tasks, the
+    * duration of the sleep is adjusted on the fly, taking into account any
+    * elapsed time. This might mean waking up instantly if the entire new
+    * interval has already elapsed.
     */
   def setMinInterval(newMinInterval: FiniteDuration): F[Unit]
 
   /** Updates the current interval.
     *
-    * If the interval changes while the Limiter is sleeping between
-    * tasks, the duration of the sleep is adjusted on the fly, taking
-    * into account any elapsed time. This might mean waking up
-    * instantly if the entire new interval has already elapsed.
+    * If the interval changes while the Limiter is sleeping between tasks, the
+    * duration of the sleep is adjusted on the fly, taking into account any
+    * elapsed time. This might mean waking up instantly if the entire new
+    * interval has already elapsed.
     */
   def updateMinInterval(update: FiniteDuration => FiniteDuration): F[Unit]
 
   /** Obtains a snapshot of the current concurrency limit.
     *
-    * May be out of date the instant after it is retrieved if a call
-    * to `setMaxConcurrent` or `updateMaxConcurrent` happens.
+    * May be out of date the instant after it is retrieved if a call to
+    * `setMaxConcurrent` or `updateMaxConcurrent` happens.
     */
   def maxConcurrent: F[Int]
 
   /** Resets the task concurrency limit.
     *
-    * If `maxConcurrent` gets changed while the Limiter is already
-    * blocked waiting for some tasks to finish, the Limiter will then
-    * be unblocked as soon as the number of running tasks goes below
-    * `newMaxConcurrent`.
+    * If `maxConcurrent` gets changed while the Limiter is already blocked
+    * waiting for some tasks to finish, the Limiter will then be unblocked as
+    * soon as the number of running tasks goes below `newMaxConcurrent`.
     *
-    * Note however that if the concurrency limit shrinks the Limiter
-    * will not try to interrupt tasks that are already running, so for
-    * some time it might be that `runningTasks > maxConcurrent`.
+    * Note however that if the concurrency limit shrinks the Limiter will not
+    * try to interrupt tasks that are already running, so for some time it might
+    * be that `runningTasks > maxConcurrent`.
     */
   def setMaxConcurrent(newMaxConcurrent: Int): F[Unit]
 
   /** Updates the task concurrency limit.
     *
-    * If `maxConcurrent` gets changed while the Limiter is already
-    * blocked waiting for some tasks to finish, the Limiter will then
-    * be unblocked as soon as the number of running tasks goes below
-    * `newMaxConcurrent`.
+    * If `maxConcurrent` gets changed while the Limiter is already blocked
+    * waiting for some tasks to finish, the Limiter will then be unblocked as
+    * soon as the number of running tasks goes below `newMaxConcurrent`.
     *
-    * Note however that if the concurrency limit shrinks the Limiter
-    * will not try to interrupt tasks that are already running, so for
-    * some time it might be that `runningTasks > maxConcurrent`.
+    * Note however that if the concurrency limit shrinks the Limiter will not
+    * try to interrupt tasks that are already running, so for some time it might
+    * be that `runningTasks > maxConcurrent`.
     */
   def updateMaxConcurrent(update: Int => Int): F[Unit]
 }
 
 object Limiter {
 
-  /** Signals that the number of jobs waiting to be executed has
-    * reached the maximum allowed number. See [[Limiter.start]]
+  /** Signals that the number of jobs waiting to be executed has reached the
+    * maximum allowed number. See [[Limiter.start]]
     */
   case class LimitReachedException() extends Exception
 
@@ -150,16 +143,14 @@ object Limiter {
   /** Creates a new [[Limiter]] and starts processing submitted jobs at a
     * regular rate, in priority order.
     *
-    * It's recommended to use an explicit type ascription such
-    * as `Limiter.start[IO]` or `Limiter.start[F]` when calling
-    * `start`, to avoid type inference issues.
+    * It's recommended to use an explicit type ascription such as
+    * `Limiter.start[IO]` or `Limiter.start[F]` when calling `start`, to avoid
+    * type inference issues.
     *
-    * In order to avoid bursts, jobs submitted to the [[Limiter]] are
-    * started at regular intervals, as specified by the `minInterval`
-    * parameter.
-    * You can pass `minInterval` as a `FiniteDuration`, or using
-    * **upperbound**'s rate syntax (note the underscore in the `rate`
-    * import):
+    * In order to avoid bursts, jobs submitted to the [[Limiter]] are started at
+    * regular intervals, as specified by the `minInterval` parameter. You can
+    * pass `minInterval` as a `FiniteDuration`, or using **upperbound**'s rate
+    * syntax (note the underscore in the `rate` import):
     * {{{
     * import upperbound._
     * import upperbound.syntax.rate._
@@ -173,36 +164,33 @@ object Limiter {
     * Limiter.start[IO](minInterval = 60 every 1.minute)
     * }}}
     *
-    * If the duration of some jobs is longer than `minInterval`,
-    * multiple jobs will be started concurrently.
-    * You can limit the amount of concurrency with the `maxConcurrent`
-    * parameter: upon reaching `maxConcurrent` running jobs, the
-    * [[Limiter]] will stop pulling new ones until old ones terminate.
-    * Note that this means that the specified interval between jobs is
-    * indeed a _minimum_ interval, and it could be longer if the
-    * `maxConcurrent` bound gets hit. The default is no limit.
+    * If the duration of some jobs is longer than `minInterval`, multiple jobs
+    * will be started concurrently. You can limit the amount of concurrency with
+    * the `maxConcurrent` parameter: upon reaching `maxConcurrent` running jobs,
+    * the [[Limiter]] will stop pulling new ones until old ones terminate. Note
+    * that this means that the specified interval between jobs is indeed a
+    * _minimum_ interval, and it could be longer if the `maxConcurrent` bound
+    * gets hit. The default is no limit.
     *
-    * Jobs that are waiting to be executed are queued up in memory, and
-    * you can control the maximum size of this queue with the
-    * `maxQueued` parameter.
-    * Once this number is reached, submitting new jobs will immediately
-    * fail with a [[LimitReachedException]], so that you can in turn signal
-    * for backpressure downstream. Submission is allowed again as soon as
-    * the number of jobs waiting goes below `maxQueued`.
-    * `maxQueued` must be > 0. The default is no limit.
+    * Jobs that are waiting to be executed are queued up in memory, and you can
+    * control the maximum size of this queue with the `maxQueued` parameter.
+    * Once this number is reached, submitting new jobs will immediately fail
+    * with a [[LimitReachedException]], so that you can in turn signal for
+    * backpressure downstream. Submission is allowed again as soon as the number
+    * of jobs waiting goes below `maxQueued`. `maxQueued` must be > 0. The
+    * default is no limit.
     *
-    * [[Limiter]] accepts jobs at different priorities, with jobs at a
-    * higher priority being executed before lower priority ones.
+    * [[Limiter]] accepts jobs at different priorities, with jobs at a higher
+    * priority being executed before lower priority ones.
     *
     * Jobs that fail or are interrupted do not affect processing.
     *
-    * The lifetime of a [[Limiter]] is bound by the `Resource` returned
-    * by this method: make sure all the places that need limiting at the
-    * same rate share the same limiter by calling `use` on the returned
-    * `Resource` once, and passing the resulting [[Limiter]] as an
-    * argument whenever needed.
-    * When the `Resource` is finalised, all pending and running jobs are
-    * canceled. All outstanding calls to `submit` are also canceled.
+    * The lifetime of a [[Limiter]] is bound by the `Resource` returned by this
+    * method: make sure all the places that need limiting at the same rate share
+    * the same limiter by calling `use` on the returned `Resource` once, and
+    * passing the resulting [[Limiter]] as an argument whenever needed. When the
+    * `Resource` is finalised, all pending and running jobs are canceled. All
+    * outstanding calls to `submit` are also canceled.
     */
   def start[F[_]: Temporal](
       minInterval: FiniteDuration,
@@ -290,8 +278,8 @@ object Limiter {
   }
 
   /** Creates a no-op [[Limiter]], with no rate limiting and a synchronous
-    * `submit` method. `pending` is always zero.
-    * `interval` is set to zero and changes to it have no effect.
+    * `submit` method. `pending` is always zero. `interval` is set to zero and
+    * changes to it have no effect.
     */
   def noOp[F[_]: Applicative]: Limiter[F] =
     new Limiter[F] {

@@ -26,9 +26,9 @@ import cats.effect._
 import cats.syntax.all._
 import cats.effect.syntax.all._
 
-/** Packages `fa` to be queued for later execution,
-  * and controls propagation of the result from executor to client,
-  * and propagation of cancelation from client to executor.
+/** Packages `fa` to be queued for later execution, and controls propagation of
+  * the result from executor to client, and propagation of cancelation from
+  * client to executor.
   */
 private[upperbound] case class Task[F[_]: Concurrent, A](
     task: F[A],
@@ -37,9 +37,8 @@ private[upperbound] case class Task[F[_]: Concurrent, A](
 ) {
   private val F = Concurrent[F]
 
-  /** Packages `task` for later execution.
-    * Cannot fail.
-    * Propagates result to `waitResult`, including cancelation.
+  /** Packages `task` for later execution. Cannot fail. Propagates result to
+    * `waitResult`, including cancelation.
     */
   def executable: F[Unit] =
     F.uncancelable { poll =>
@@ -65,9 +64,8 @@ private[upperbound] case class Task[F[_]: Concurrent, A](
   def cancel: F[Unit] =
     (stopSignal.complete(()) >> result.get.void).uncancelable
 
-  /** Completes when `executable` does, canceling itself if
-    * `executable` gets canceled.
-    * However, canceling `waitResult` does not cancel `executable`
+  /** Completes when `executable` does, canceling itself if `executable` gets
+    * canceled. However, canceling `waitResult` does not cancel `executable`
     * automatically, `cancel` needs to be called manually.
     */
   def awaitResult: F[A] =

@@ -29,31 +29,30 @@ import fs2._
 
 import cats.effect.std.PQueue
 
-/** A concurrent priority queue with support for deletion.
-  * Reads block on empty queue, writes fail on full queue.
+/** A concurrent priority queue with support for deletion. Reads block on empty
+  * queue, writes fail on full queue.
   */
 private[upperbound] trait Queue[F[_], A] {
   type Id
 
-  /** Enqueues an element. A higher number means higher priority,
-    * with 0 as the default. Fails if the queue is full.
-    * Returns an Id that can be used to mark the element as deleted.
+  /** Enqueues an element. A higher number means higher priority, with 0 as the
+    * default. Fails if the queue is full. Returns an Id that can be used to
+    * mark the element as deleted.
     */
   def enqueue(a: A, priority: Int = 0): F[Id]
 
-  /** Marks the element at this Id as deleted.
-    * Returns false if the element was not in the queue.
+  /** Marks the element at this Id as deleted. Returns false if the element was
+    * not in the queue.
     */
   def delete(id: Id): F[Boolean]
 
-  /** Dequeues the highest priority element. In case there
-    * are multiple elements with the same priority, they are
-    * dequeued in FIFO order.
-    * Semantically blocks if the queue is empty.
+  /** Dequeues the highest priority element. In case there are multiple elements
+    * with the same priority, they are dequeued in FIFO order. Semantically
+    * blocks if the queue is empty.
     *
-    * Elements marked as deleted are removed and skipped,
-    * and the next element in the queue gets returned instead,
-    * semantically blocking if there is no next element.
+    * Elements marked as deleted are removed and skipped, and the next element
+    * in the queue gets returned instead, semantically blocking if there is no
+    * next element.
     */
   def dequeue: F[A]
 
@@ -62,8 +61,8 @@ private[upperbound] trait Queue[F[_], A] {
   def dequeueAll: Stream[F, A] =
     Stream.repeatEval(dequeue)
 
-  /** Obtains a snapshot of the current number of elements in the
-    * queue. May be out of date the instant after it is retrieved.
+  /** Obtains a snapshot of the current number of elements in the queue. May be
+    * out of date the instant after it is retrieved.
     */
   def size: F[Int]
 }
