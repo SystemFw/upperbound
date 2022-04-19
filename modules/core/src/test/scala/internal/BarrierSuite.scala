@@ -26,10 +26,8 @@ import cats.effect._
 import cats.syntax.all._
 import scala.concurrent.duration._
 
-import cats.effect.testkit.TestControl.{
-  executeEmbed => runTC,
-  NonTerminationException
-}
+import cats.effect.testkit.TestControl
+import cats.effect.testkit.TestControl.NonTerminationException
 
 class BarrierSuite extends BaseSuite {
   private def fillBarrier(barrier: Barrier[IO]): IO[Unit] =
@@ -43,7 +41,7 @@ class BarrierSuite extends BaseSuite {
   test("enter the barrier immediately if below the limit") {
     val prog = Barrier[IO](10).flatMap(_.enter)
 
-    runTC(prog)
+    TestControl.executeEmbed(prog)
   }
 
   test("enter blocks when limit is hit") {
@@ -51,7 +49,7 @@ class BarrierSuite extends BaseSuite {
       fillBarrier(barrier) >> barrier.enter
     }
 
-    runTC(prog).intercept[NonTerminationException]
+    TestControl.executeEmbed(prog).intercept[NonTerminationException]
   }
 
   test("enter is unblocked by exit") {
@@ -61,7 +59,7 @@ class BarrierSuite extends BaseSuite {
       }
     }
 
-    runTC(prog).assertEquals(1.second)
+    TestControl.executeEmbed(prog).assertEquals(1.second)
   }
 
   test("enter is unblocked by exit the right amount of times") {
@@ -77,7 +75,7 @@ class BarrierSuite extends BaseSuite {
           }
       }
 
-    runTC(prog).assertEquals(2.seconds)
+    TestControl.executeEmbed(prog).assertEquals(2.seconds)
   }
 
   test("Only one fiber can block on enter at the same time") {
@@ -86,7 +84,7 @@ class BarrierSuite extends BaseSuite {
         fillBarrier(barrier) >> (barrier.enter, barrier.enter).parTupled
       }
 
-    runTC(prog).intercept[Throwable]
+    TestControl.executeEmbed(prog).intercept[Throwable]
   }
 
   test("Cannot call exit without entering") {
@@ -94,7 +92,7 @@ class BarrierSuite extends BaseSuite {
       barrier.exit >> barrier.enter
     }
 
-    runTC(prog).intercept[Throwable]
+    TestControl.executeEmbed(prog).intercept[Throwable]
   }
 
   test("Calls to exit cannot outnumber calls to enter") {
@@ -102,7 +100,7 @@ class BarrierSuite extends BaseSuite {
       barrier.enter >> barrier.enter >> barrier.exit >> barrier.exit >> barrier.exit
     }
 
-    runTC(prog).intercept[Throwable]
+    TestControl.executeEmbed(prog).intercept[Throwable]
   }
 
   test("Cannot construct a barrier with a 0 limit") {
@@ -126,7 +124,7 @@ class BarrierSuite extends BaseSuite {
           }
       }
 
-    runTC(prog).assertEquals(2.seconds)
+    TestControl.executeEmbed(prog).assertEquals(2.seconds)
   }
 
   test("A blocked enter is not unblocked prematurely if the limit is shrunk") {
@@ -141,7 +139,7 @@ class BarrierSuite extends BaseSuite {
           }
       }
 
-    runTC(prog).intercept[NonTerminationException]
+    TestControl.executeEmbed(prog).intercept[NonTerminationException]
   }
 
   test("Sequential limit changes") {
@@ -158,6 +156,6 @@ class BarrierSuite extends BaseSuite {
           }
       }
 
-    runTC(prog).intercept[NonTerminationException]
+    TestControl.executeEmbed(prog).intercept[NonTerminationException]
   }
 }

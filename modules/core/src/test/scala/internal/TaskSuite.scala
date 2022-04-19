@@ -26,7 +26,7 @@ import cats.effect._
 import cats.syntax.all._
 import scala.concurrent.duration._
 
-import cats.effect.testkit.TestControl.{executeEmbed => runTC}
+import cats.effect.testkit.TestControl
 import java.util.concurrent.CancellationException
 
 class TaskSuite extends BaseSuite {
@@ -47,19 +47,19 @@ class TaskSuite extends BaseSuite {
         .create { IO.raiseError[Unit](new MyException) }
         .flatMap(_.executable)
 
-    runTC(prog)
+    TestControl.executeEmbed(prog)
   }
 
   test("Task propagates results") {
     val prog = executeAndWait { IO.sleep(1.second).as(42) }
 
-    runTC(prog).assertEquals(42)
+    TestControl.executeEmbed(prog).assertEquals(42)
   }
 
   test("Task propagates errors") {
     val prog = executeAndWait { IO.raiseError[Unit](new MyException) }
 
-    runTC(prog).intercept[MyException]
+    TestControl.executeEmbed(prog).intercept[MyException]
   }
 
   test("Task propagates cancellation") {
@@ -68,7 +68,7 @@ class TaskSuite extends BaseSuite {
     /* TestControl reports cancelation and nontermination with different
      * exceptions, a deadlock in Task.awaitResult would make this test fail
      */
-    runTC(prog).intercept[CancellationException]
+    TestControl.executeEmbed(prog).intercept[CancellationException]
   }
 
   test("cancel cancels the Task executable") {
@@ -76,7 +76,7 @@ class TaskSuite extends BaseSuite {
       execute { IO.never[Unit] }
         .flatMap { case (wait, cancel) => cancel >> wait }
 
-    runTC(prog).intercept[CancellationException]
+    TestControl.executeEmbed(prog).intercept[CancellationException]
   }
 
   test("cancel backpressures on finalisers") {
@@ -86,6 +86,6 @@ class TaskSuite extends BaseSuite {
           IO.sleep(10.millis) >> cancel.timed.map(_._1)
         }
 
-    runTC(prog).assertEquals(1.second)
+    TestControl.executeEmbed(prog).assertEquals(1.second)
   }
 }
