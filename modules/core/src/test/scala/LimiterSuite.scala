@@ -24,7 +24,7 @@ package upperbound
 import fs2._
 import cats.effect._
 import scala.concurrent.duration._
-
+import cats.syntax.all._
 import cats.effect.testkit.TestControl
 
 class LimiterSuite extends BaseSuite {
@@ -38,7 +38,7 @@ class LimiterSuite extends BaseSuite {
       samplingWindow: FiniteDuration
   ): IO[Vector[Long]] =
     Limiter.start[IO](desiredInterval, maxConcurrent).use { limiter =>
-      def job = IO.monotonic.flatMap { t => IO.sleep(jobCompletion).as(t) }
+      def job = IO.monotonic <* IO.sleep(jobCompletion)
 
       def producer =
         Stream(job)
@@ -133,7 +133,28 @@ class LimiterSuite extends BaseSuite {
     TestControl.executeEmbed(prog).assertEquals(expected)
   }
 
-  test("descheduling job, interval unaffected") {}
-  test("cancelling job, interval slot gets taken") {}
+  test("descheduling job, interval unaffected".only) {
+    // because dequeue runs concurrently with the barrier and the timer,
+    // the element gets dequeued before its slot arrives, so it's already outside of the queue
+    // and the slot gets indeed taken
+    TestControl
+      .executeEmbed {
+        Limiter.start[IO](500.millis).use { limiter =>
+          val job = limiter.submit(IO.monotonic)
+          val canceledJob = limiter.submit(job).timeout(200.millis).attempt
+          val skew = IO.sleep(10.millis) // to ensure we queue jobs as desired
+
+          (
+            job,
+            skew >> canceledJob,
+            skew >> skew >> job
+          ).parMapN { case (first, _, third) =>
+            third.toMillis - first.toMillis
+          }
+        }
+      }
+      .assertEquals(500L)
+  }
+//  test("cancelling job, interval slot gets taken") {}
   // first task immediatelY?
 }

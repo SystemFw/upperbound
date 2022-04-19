@@ -222,8 +222,9 @@ object Limiter {
               .flatMap { id =>
                 val propagateCancelation =
                   queue.delete(id).flatMap { deleted =>
-                    // task has already been dequeued and running
-                    task.cancel.whenA(!deleted)
+                    F.unit.map(_ => println(s"YOOOO deleted is $deleted")) >>
+                      // task has already been dequeued and running
+                      task.cancel.whenA(!deleted)
                   }
 
                 poll(task.awaitResult).onCancel(propagateCancelation)
