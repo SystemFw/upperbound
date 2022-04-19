@@ -134,12 +134,24 @@ class LimiterSuite extends BaseSuite {
     TestControl.executeEmbed(prog).assertEquals(expected)
   }
 
-  test("descheduling job, interval unaffected") {
-    // because dequeue runs concurrently with the barrier and the timer,
-    // the element gets dequeued before its slot arrives, so it's already outside of the queue
-    // and the slot gets indeed taken
+  test("descheduling job, interval unaffected - time limit") {
     val prog = Limiter.start[IO](500.millis).use { limiter =>
       val job = limiter.submit(IO.monotonic)
+      val skew = IO.sleep(10.millis) // to ensure we queue jobs as desired
+
+      (
+        job,
+        skew >> job.timeoutTo(200.millis, IO.unit),
+        skew >> skew >> job
+      ).parMapN((t1, _, t3) => t3.toMillis - t1.toMillis)
+    }
+
+    TestControl.executeEmbed(prog).assertEquals(500L)
+  }
+
+  test("descheduling job, interval unaffected - concurrency limit") {
+    val prog = Limiter.start[IO](30.millis, maxConcurrent = 1).use { limiter =>
+      val job = limiter.submit(IO.monotonic <* IO.sleep(500.millis))
       val skew = IO.sleep(10.millis) // to ensure we queue jobs as desired
 
       (
