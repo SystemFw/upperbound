@@ -133,28 +133,40 @@ class LimiterSuite extends BaseSuite {
     TestControl.executeEmbed(prog).assertEquals(expected)
   }
 
-  test("descheduling job, interval unaffected".only) {
+  test("descheduling job, interval unaffected") {
     // because dequeue runs concurrently with the barrier and the timer,
     // the element gets dequeued before its slot arrives, so it's already outside of the queue
     // and the slot gets indeed taken
-    TestControl
-      .executeEmbed {
-        Limiter.start[IO](500.millis).use { limiter =>
-          val job = limiter.submit(IO.monotonic)
-          val canceledJob = limiter.submit(job).timeout(200.millis).attempt
-          val skew = IO.sleep(10.millis) // to ensure we queue jobs as desired
+    val prog = Limiter.start[IO](500.millis).use { limiter =>
+      val job = limiter.submit(IO.monotonic)
+      val skew = IO.sleep(10.millis) // to ensure we queue jobs as desired
 
-          (
-            job,
-            skew >> canceledJob,
-            skew >> skew >> job
-          ).parMapN { case (first, _, third) =>
-            third.toMillis - first.toMillis
-          }
-        }
-      }
-      .assertEquals(500L)
+      (
+        job,
+        skew >> job.timeoutTo(200.millis, IO.unit),
+        skew >> skew >> job
+      ).parMapN((t1, _, t3) => t3.toMillis - t1.toMillis)
+    }
+
+    TestControl.executeEmbed(prog).assertEquals(500L)
   }
-//  test("cancelling job, interval slot gets taken") {}
-  // first task immediatelY?
+
+  test("cancelling job, interval slot gets taken") {
+    val prog = Limiter.start[IO](100.millis).use { limiter =>
+      val job = limiter.submit(IO.monotonic)
+      val canceledJob = limiter
+        .submit(IO.monotonic <* IO.sleep(50.millis))
+        .as("done")
+        .timeoutTo(125.millis, "canceled".pure[IO])
+      val skew = IO.sleep(10.millis) // to ensure we queue jobs as desired
+
+      (
+        job,
+        skew >> canceledJob,
+        skew >> skew >> job
+      ).parMapN((t1, outcome, t3) => (outcome, t3.toMillis - t1.toMillis))
+    }
+
+    TestControl.executeEmbed(prog).assertEquals("canceled" -> 200L)
+  }
 }
