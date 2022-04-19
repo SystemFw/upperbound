@@ -263,14 +263,13 @@ object Limiter {
 
           supervisor.supervise(job) >>
             (
-              queue.dequeue,
               barrier.enter,
               timer.sleep
-            ).parMapN { (next, _, _) => go(next) }.flatten
+            ).parTupled >> queue.dequeue.flatMap(go)
         }
 
         /* execute fhe first task immediately */
-        (queue.dequeue, barrier.enter).parMapN { (next, _) => go(next) }.flatten
+        barrier.enter >> queue.dequeue.flatMap(go)
       }
 
       executor.background.as(limiter)
