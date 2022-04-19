@@ -182,4 +182,22 @@ class LimiterSuite extends BaseSuite {
 
     TestControl.executeEmbed(prog).assertEquals("canceled" -> 200L)
   }
+
+  test("max concurrency shrink before interval elapses") {
+    val prog =
+      Limiter.start[IO](500.millis, maxConcurrent = 2).use { limiter =>
+        val skew = IO.sleep(10.millis)
+        (
+          limiter.submit(IO.monotonic <* IO.sleep(700.millis)),
+          skew >> limiter.submit(IO.monotonic),
+          IO.sleep(300.millis) >> limiter.setMaxConcurrent(1)
+        ).parMapN((t1, t2, _) => t2.toMillis - t1.toMillis)
+      }
+
+    // what is the right behaviour?
+    // sleep >> enter: 700
+    // par(sleep, enter) : 500
+    // enter >> sleep: breaks other tests, incorrect
+    TestControl.executeEmbed(prog).assertEquals(17L)
+  }
 }
