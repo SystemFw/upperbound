@@ -23,8 +23,8 @@ package upperbound
 package internal
 
 import cats.syntax.all._
-import fs2.Stream
-import cats.effect.Temporal
+import cats.effect._
+import fs2._
 import fs2.concurrent.SignallingRef
 import scala.concurrent.duration._
 

@@ -22,9 +22,9 @@
 package upperbound
 package internal
 
+import scala.concurrent.duration._
 import cats.effect._
 import cats.syntax.all._
-import scala.concurrent.duration._
 
 import cats.effect.testkit.TestControl
 import java.util.concurrent.CancellationException

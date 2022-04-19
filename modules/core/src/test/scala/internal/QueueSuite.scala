@@ -22,9 +22,9 @@
 package upperbound
 package internal
 
-import fs2.Stream
-import cats.effect._
 import cats.syntax.all._
+import cats.effect._
+import fs2.Stream
 import scala.concurrent.duration._
 
 import org.scalacheck.effect.PropF.forAllF

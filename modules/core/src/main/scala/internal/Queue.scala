@@ -25,9 +25,8 @@ package internal
 import cats._
 import cats.syntax.all._
 import cats.effect._
-import fs2._
-
 import cats.effect.std.PQueue
+import fs2._
 
 /** A concurrent priority queue with support for deletion. Reads block on empty
   * queue, writes fail on full queue.

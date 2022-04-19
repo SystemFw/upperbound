@@ -22,9 +22,9 @@
 package upperbound
 package internal
 
-import cats.effect._
 import cats.syntax.all._
-import cats.effect.syntax.all._
+import cats.effect._
+import cats.effect.implicits._
 
 /** Packages `fa` to be queued for later execution, and controls propagation of
   * the result from executor to client, and propagation of cancelation from

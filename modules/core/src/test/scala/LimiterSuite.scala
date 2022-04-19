@@ -21,10 +21,11 @@
 
 package upperbound
 
-import fs2._
-import cats.effect._
-import scala.concurrent.duration._
 import cats.syntax.all._
+import cats.effect._
+import fs2._
+import scala.concurrent.duration._
+
 import cats.effect.testkit.TestControl
 
 class LimiterSuite extends BaseSuite {

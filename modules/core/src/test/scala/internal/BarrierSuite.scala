@@ -22,8 +22,8 @@
 package upperbound
 package internal
 
-import cats.effect._
 import cats.syntax.all._
+import cats.effect._
 import scala.concurrent.duration._
 
 import cats.effect.testkit.TestControl

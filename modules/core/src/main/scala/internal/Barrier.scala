@@ -22,9 +22,9 @@
 package upperbound
 package internal
 
+import cats.syntax.all._
 import cats.effect._
 import cats.effect.implicits._
-import cats.syntax.all._
 
 /** A dynamic barrier which is meant to be used in conjunction with a task
   * executor. As such, it assumes there is only a single fiber entering the
