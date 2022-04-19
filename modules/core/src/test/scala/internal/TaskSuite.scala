@@ -47,7 +47,7 @@ class TaskSuite extends BaseSuite {
         .create { IO.raiseError[Unit](new MyException) }
         .flatMap(_.executable)
 
-    TestControl.executeEmbed(prog)
+    TestControl.executeEmbed(prog).assert
   }
 
   test("Task propagates results") {

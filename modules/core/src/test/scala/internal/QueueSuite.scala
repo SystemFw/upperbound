@@ -82,44 +82,42 @@ class QueueSuite extends BaseSuite {
   }
 
   test("block on an empty queue until an element is available") {
-    TestControl.executeEmbed {
-      Queue[IO, Unit]()
-        .flatMap { q =>
-          def prod = IO.sleep(1.second) >> q.enqueue(())
-          def consumer = q.dequeue.timeout(3.seconds)
+    val prog = Queue[IO, Unit]()
+      .flatMap { q =>
+        def prod = IO.sleep(1.second) >> q.enqueue(())
+        def consumer = q.dequeue.timeout(3.seconds)
 
-          prod.start >> consumer
-        }
-    }.void
+        prod.start >> consumer
+      }
+
+    TestControl.executeEmbed(prog).assert
   }
 
   test(
     "If a dequeue gets canceled before an enqueue, no elements are lost in the next dequeue"
   ) {
-    TestControl.executeEmbed {
-      Queue[IO, Unit]().flatMap { q =>
-        q.dequeue.timeout(2.second).attempt >>
-          q.enqueue(()) >>
-          q.dequeue.timeout(1.second)
-      }
+    val prog = Queue[IO, Unit]().flatMap { q =>
+      q.dequeue.timeout(2.second).attempt >>
+        q.enqueue(()) >>
+        q.dequeue.timeout(1.second)
     }
+
+    TestControl.executeEmbed(prog).assert
   }
 
   test("Mark an element as deleted") {
-    TestControl
-      .executeEmbed {
-        Queue[IO, Int]().flatMap { q =>
-          q.enqueue(1).flatMap { id =>
-            q.enqueue(2) >>
-              q.delete(id) >>
-              (
-                q.dequeue,
-                q.dequeue.map(_.some).timeoutTo(1.second, None.pure[IO])
-              ).tupled
-          }
-        }
+    val prog = Queue[IO, Int]().flatMap { q =>
+      q.enqueue(1).flatMap { id =>
+        q.enqueue(2) >>
+          q.delete(id) >>
+          (
+            q.dequeue,
+            q.dequeue.map(_.some).timeoutTo(1.second, None.pure[IO])
+          ).tupled
       }
-      .assertEquals(2 -> None)
+    }
+
+    TestControl.executeEmbed(prog).assertEquals(2 -> None)
   }
 
   // This test uses real concurrency to maximise racing
@@ -127,17 +125,18 @@ class QueueSuite extends BaseSuite {
     // Number of iterations to make potential races repeatable
     val n = 1000
 
-    def prog(q: Queue[IO, Int]) =
-      q.enqueue(1).flatMap { id =>
-        q.enqueue(2) >>
-          (
-            q.delete(id),
-            q.dequeue
-          ).parTupled
+    val prog =
+      Queue[IO, Int]().flatMap { q =>
+        q.enqueue(1).flatMap { id =>
+          q.enqueue(2) >>
+            (
+              q.delete(id),
+              q.dequeue
+            ).parTupled
+        }
       }
 
-    Queue[IO, Int]()
-      .flatMap(prog)
+    prog
       .replicateA(n)
       .map { results =>
         results.forall { case (deleted, elem) =>

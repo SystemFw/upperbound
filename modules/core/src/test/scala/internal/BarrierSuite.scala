@@ -41,7 +41,7 @@ class BarrierSuite extends BaseSuite {
   test("enter the barrier immediately if below the limit") {
     val prog = Barrier[IO](10).flatMap(_.enter)
 
-    TestControl.executeEmbed(prog)
+    TestControl.executeEmbed(prog).assert
   }
 
   test("enter blocks when limit is hit") {
