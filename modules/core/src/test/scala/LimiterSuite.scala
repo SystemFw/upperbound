@@ -37,7 +37,7 @@ class LimiterSuite extends BaseSuite {
       jobsPerProducer: Int,
       jobCompletion: FiniteDuration,
       samplingWindow: FiniteDuration
-  ): IO[Vector[Long]] =
+  ): IO[Vector[FiniteDuration]] =
     Limiter.start[IO](desiredInterval, maxConcurrent).use { limiter =>
       def job = IO.monotonic <* IO.sleep(jobCompletion)
 
@@ -57,7 +57,7 @@ class LimiterSuite extends BaseSuite {
       def results =
         runProducers
           .sliding(2)
-          .map { sample => sample(1).toMillis - sample(0).toMillis }
+          .map { sample => sample(1) - sample(0) }
           .compile
           .toVector
 
@@ -99,7 +99,9 @@ class LimiterSuite extends BaseSuite {
       samplingWindow = 10.seconds
     )
 
-    TestControl.executeEmbed(prog).map { r => assert(r.forall(_ == 200L)) }
+    TestControl.executeEmbed(prog).map { r =>
+      assert(r.forall(_ == 200.millis))
+    }
   }
 
   test("slow producer, no unnecessary delays") {
@@ -113,7 +115,9 @@ class LimiterSuite extends BaseSuite {
       samplingWindow = 10.seconds
     )
 
-    TestControl.executeEmbed(prog).map { r => assert(r.forall(_ == 300L)) }
+    TestControl.executeEmbed(prog).map { r =>
+      assert(r.forall(_ == 300.millis))
+    }
   }
 
   test("maximum concurrency") {
@@ -129,7 +133,7 @@ class LimiterSuite extends BaseSuite {
 
     val expected = Vector(
       50L, 50, 200, 50, 50, 200, 50, 50, 200
-    )
+    ).map(_.millis)
 
     TestControl.executeEmbed(prog).assertEquals(expected)
   }
@@ -143,10 +147,10 @@ class LimiterSuite extends BaseSuite {
         job,
         skew >> job.timeoutTo(200.millis, IO.unit),
         skew >> skew >> job
-      ).parMapN((t1, _, t3) => t3.toMillis - t1.toMillis)
+      ).parMapN((t1, _, t3) => t3 - t1)
     }
 
-    TestControl.executeEmbed(prog).assertEquals(500L)
+    TestControl.executeEmbed(prog).assertEquals(500.millis)
   }
 
   test("descheduling job, interval unaffected - concurrency limit") {
@@ -158,10 +162,10 @@ class LimiterSuite extends BaseSuite {
         job,
         skew >> job.timeoutTo(200.millis, IO.unit),
         skew >> skew >> job
-      ).parMapN((t1, _, t3) => t3.toMillis - t1.toMillis)
+      ).parMapN((t1, _, t3) => t3 - t1)
     }
 
-    TestControl.executeEmbed(prog).assertEquals(500L)
+    TestControl.executeEmbed(prog).assertEquals(500.millis)
   }
 
   test("cancelling job, interval slot gets taken") {
@@ -177,10 +181,10 @@ class LimiterSuite extends BaseSuite {
         job,
         skew >> canceledJob,
         skew >> skew >> job
-      ).parMapN((t1, outcome, t3) => (outcome, t3.toMillis - t1.toMillis))
+      ).parMapN((t1, outcome, t3) => (outcome, t3 - t1))
     }
 
-    TestControl.executeEmbed(prog).assertEquals("canceled" -> 200L)
+    TestControl.executeEmbed(prog).assertEquals("canceled" -> 200.millis)
   }
 
   test("max concurrency shrinks before interval elapses, should be respected") {
