@@ -3,13 +3,13 @@
 Add to your `build.sbt`
 
 ```scala
-libraryDependencies += "org.systemfw" %% "upperbound" % "0.4.0-M2"
+libraryDependencies += "org.systemfw" %% "upperbound" % "0.4.0"
 ```
 
 `upperbound` is published for the following versions of Scala:
 
-- **2.13.6**
-- **3.1.0**
+- **2.13.8**
+- **3.1.2**
 - **2.12.14**
 
 and depends on **cats-effect** and **fs2**.
