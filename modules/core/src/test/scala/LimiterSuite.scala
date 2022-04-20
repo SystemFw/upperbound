@@ -143,7 +143,7 @@ class LimiterSuite extends BaseSuite {
       jobsPerProducer = 10,
       jobCompletion = 0.seconds,
       control =
-        limiter => IO.sleep(1.seconds) >> limiter.setMinInterval(300.millis)
+        limiter => IO.sleep(1100.millis) >> limiter.setMinInterval(300.millis)
     )
 
     val expected = Vector(
