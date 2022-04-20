@@ -133,7 +133,9 @@ class LimiterSuite extends BaseSuite {
     TestControl.executeEmbed(prog).assertEquals(expected)
   }
 
-  test("descheduling job, interval unaffected - time limit") {
+  test(
+    "descheduling a job while blocked on the time limit should not affect the interval"
+  ) {
     val prog = Limiter.start[IO](500.millis).use { limiter =>
       val job = limiter.submit(IO.monotonic)
       val skew = IO.sleep(10.millis) // to ensure we queue jobs as desired
@@ -148,7 +150,9 @@ class LimiterSuite extends BaseSuite {
     TestControl.executeEmbed(prog).assertEquals(500.millis)
   }
 
-  test("descheduling job, interval unaffected - concurrency limit") {
+  test(
+    "descheduling a job while blocked on the concurrency limit should not affect the interval"
+  ) {
     val prog = Limiter.start[IO](30.millis, maxConcurrent = 1).use { limiter =>
       val job = limiter.submit(IO.monotonic <* IO.sleep(500.millis))
       val skew = IO.sleep(10.millis) // to ensure we queue jobs as desired
@@ -217,6 +221,4 @@ class LimiterSuite extends BaseSuite {
 
     TestControl.executeEmbed(prog).assertEquals(interval)
   }
-
-  // simple interval change test
 }
