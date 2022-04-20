@@ -35,8 +35,7 @@ class LimiterSuite extends BaseSuite {
       productionInterval: FiniteDuration,
       producers: Int,
       jobsPerProducer: Int,
-      jobCompletion: FiniteDuration,
-      samplingWindow: FiniteDuration
+      jobCompletion: FiniteDuration
   ): IO[Vector[FiniteDuration]] =
     Limiter.start[IO](desiredInterval, maxConcurrent).use { limiter =>
       def job = IO.monotonic <* IO.sleep(jobCompletion)
@@ -52,7 +51,6 @@ class LimiterSuite extends BaseSuite {
         Stream(producer)
           .repeatN(producers.toLong)
           .parJoinUnbounded
-          .interruptAfter(samplingWindow)
 
       def results =
         runProducers
@@ -95,8 +93,7 @@ class LimiterSuite extends BaseSuite {
       productionInterval = 1.millis,
       producers = 4,
       jobsPerProducer = 100,
-      jobCompletion = 0.seconds,
-      samplingWindow = 10.seconds
+      jobCompletion = 0.seconds
     )
 
     TestControl.executeEmbed(prog).map { r =>
@@ -111,8 +108,7 @@ class LimiterSuite extends BaseSuite {
       productionInterval = 300.millis,
       producers = 1,
       jobsPerProducer = 100,
-      jobCompletion = 0.seconds,
-      samplingWindow = 10.seconds
+      jobCompletion = 0.seconds
     )
 
     TestControl.executeEmbed(prog).map { r =>
@@ -127,8 +123,7 @@ class LimiterSuite extends BaseSuite {
       productionInterval = 1.millis,
       producers = 1,
       jobsPerProducer = 10,
-      jobCompletion = 300.millis,
-      samplingWindow = 10.seconds
+      jobCompletion = 300.millis
     )
 
     val expected = Vector(
