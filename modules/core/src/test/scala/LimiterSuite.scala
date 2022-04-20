@@ -35,7 +35,8 @@ class LimiterSuite extends BaseSuite {
       productionInterval: FiniteDuration,
       producers: Int,
       jobsPerProducer: Int,
-      jobCompletion: FiniteDuration
+      jobCompletion: FiniteDuration,
+      control: Limiter[IO] => IO[Unit] = _ => IO.unit
   ): IO[Vector[FiniteDuration]] =
     Limiter.start[IO](desiredInterval, maxConcurrent).use { limiter =>
       def job = IO.monotonic <* IO.sleep(jobCompletion)
@@ -59,7 +60,7 @@ class LimiterSuite extends BaseSuite {
           .compile
           .toVector
 
-      results
+      control(limiter).background.surround(results)
     }
 
   test("submit semantics should return the result of the submitted job") {
@@ -127,7 +128,26 @@ class LimiterSuite extends BaseSuite {
     )
 
     val expected = Vector(
-      50L, 50, 200, 50, 50, 200, 50, 50, 200
+      50, 50, 200, 50, 50, 200, 50, 50, 200
+    ).map(_.millis)
+
+    TestControl.executeEmbed(prog).assertEquals(expected)
+  }
+
+  test("interval change") {
+    val prog = simulation(
+      desiredInterval = 200.millis,
+      maxConcurrent = Int.MaxValue,
+      productionInterval = 1.millis,
+      producers = 1,
+      jobsPerProducer = 10,
+      jobCompletion = 0.seconds,
+      control =
+        limiter => IO.sleep(1.seconds) >> limiter.setMinInterval(300.millis)
+    )
+
+    val expected = Vector(
+      200, 200, 200, 200, 200, 300, 300, 300, 300
     ).map(_.millis)
 
     TestControl.executeEmbed(prog).assertEquals(expected)
