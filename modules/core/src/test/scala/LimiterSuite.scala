@@ -183,21 +183,41 @@ class LimiterSuite extends BaseSuite {
     TestControl.executeEmbed(prog).assertEquals("canceled" -> 200L)
   }
 
-  test("max concurrency shrink before interval elapses") {
+  test("max concurrency shrinks before interval elapses, should be respected") {
+    val interval = 500.millis
+    val taskDuration = 700.millis // > interval
+    val concurrencyShrinksAt = 300.millis // < interval
+
     val prog =
-      Limiter.start[IO](500.millis, maxConcurrent = 2).use { limiter =>
+      Limiter.start[IO](interval, maxConcurrent = 2).use { limiter =>
         val skew = IO.sleep(10.millis)
         (
-          limiter.submit(IO.monotonic <* IO.sleep(700.millis)),
+          limiter.submit(IO.monotonic <* IO.sleep(taskDuration)),
           skew >> limiter.submit(IO.monotonic),
-          IO.sleep(300.millis) >> limiter.setMaxConcurrent(1)
-        ).parMapN((t1, t2, _) => t2.toMillis - t1.toMillis)
+          IO.sleep(concurrencyShrinksAt) >> limiter.setMaxConcurrent(1)
+        ).parMapN((t1, t2, _) => t2 - t1)
       }
 
-    // what is the right behaviour?
-    // sleep >> enter: 700
-    // par(sleep, enter) : 500
-    // enter >> sleep: breaks other tests, incorrect
-    TestControl.executeEmbed(prog).assertEquals(17L)
+    TestControl.executeEmbed(prog).assertEquals(taskDuration)
   }
+
+  test("max concurrency shrinks after interval elapses, should be no-op") {
+    val interval = 300.millis
+    val taskDuration = 700.millis // > interval
+    val concurrencyShrinksAt = 500.millis // > interval
+
+    val prog =
+      Limiter.start[IO](interval, maxConcurrent = 2).use { limiter =>
+        val skew = IO.sleep(10.millis)
+        (
+          limiter.submit(IO.monotonic <* IO.sleep(taskDuration)),
+          skew >> limiter.submit(IO.monotonic),
+          IO.sleep(concurrencyShrinksAt) >> limiter.setMaxConcurrent(1)
+        ).parMapN((t1, t2, _) => t2 - t1)
+      }
+
+    TestControl.executeEmbed(prog).assertEquals(interval)
+  }
+
+  // simple interval change test
 }

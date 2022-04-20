@@ -262,8 +262,8 @@ object Limiter {
           val job = (F.unit >> fa).guarantee(barrier.exit)
 
           supervisor.supervise(job) >>
-            // (timer.sleep, barrier.enter).tupled >>
-            (timer.sleep, barrier.enter).parTupled >>
+            timer.sleep >>
+            barrier.enter >>
             queue.dequeue.flatMap(go)
         }
 
