@@ -34,9 +34,11 @@ ThisBuild / initialCommands := """
 ThisBuild / testFrameworks += new TestFramework("munit.Framework")
 ThisBuild / Test / parallelExecution := false
 
-def dep(org: String, prefix: String, version: String)(modules: String*)(testModules: String*) =
+def dep(org: String, prefix: String, version: String)(modules: String*)(
+    testModules: String*
+) =
   modules.map(m => org %% (prefix ++ m) % version) ++
-   testModules.map(m => org %% (prefix ++ m) % version % Test)
+    testModules.map(m => org %% (prefix ++ m) % version % Test)
 
 lazy val root = project
   .in(file("."))
@@ -50,11 +52,14 @@ lazy val core = project
     scalafmtOnCompile := true,
     libraryDependencies ++=
       dep("org.typelevel", "cats-", "2.7.0")("core")() ++
-      dep("org.typelevel", "cats-effect", "3.3.11")("")("-laws", "-testkit") ++
-      dep("co.fs2", "fs2-", "3.2.7")("core")() ++
-      dep("org.scalameta", "munit", "0.7.29")()("", "-scalacheck") ++
-      dep("org.typelevel", "", "1.0.7")()("munit-cats-effect-3") ++
-      dep("org.typelevel",  "scalacheck-effect", "1.0.3")()("", "-munit")
+        dep("org.typelevel", "cats-effect", "3.3.11")("")(
+          "-laws",
+          "-testkit"
+        ) ++
+        dep("co.fs2", "fs2-", "3.2.11")("core")() ++
+        dep("org.scalameta", "munit", "0.7.29")()("", "-scalacheck") ++
+        dep("org.typelevel", "", "1.0.7")()("munit-cats-effect-3") ++
+        dep("org.typelevel", "scalacheck-effect", "1.0.3")()("", "-munit")
   )
 
 lazy val docs = project
