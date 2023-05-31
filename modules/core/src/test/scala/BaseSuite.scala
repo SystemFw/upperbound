@@ -23,4 +23,6 @@ package upperbound
 
 import munit.{CatsEffectSuite, ScalaCheckEffectSuite}
 
-abstract class BaseSuite extends CatsEffectSuite with ScalaCheckEffectSuite
+abstract class BaseSuite extends CatsEffectSuite with ScalaCheckEffectSuite {
+  def isJS = Option(System.getProperty("java.vm.name")).contains("Scala.js")
+}
