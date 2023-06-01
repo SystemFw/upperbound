@@ -26,7 +26,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        scala: [2.13.8, 3.1.2, 2.12.14]
+        scala: [2.13.8, 3.2.2, 2.12.14]
         java: [temurin@11]
     runs-on: ${{ matrix.os }}
     steps:
@@ -63,7 +63,7 @@ jobs:
         run: sbt ++${{ matrix.scala }} docs/mdoc
 
       - name: Compress target directories
-        run: tar cf targets.tar target modules/core/target project/target
+        run: tar cf targets.tar target modules/core/.native/target modules/core/.js/target modules/core/.jvm/target project/target
 
       - name: Upload target directories
         uses: actions/upload-artifact@v2
@@ -116,12 +116,12 @@ jobs:
           tar xf targets.tar
           rm targets.tar
 
-      - name: Download target directories (3.1.2)
+      - name: Download target directories (3.2.2)
         uses: actions/download-artifact@v2
         with:
-          name: target-${{ matrix.os }}-3.1.2-${{ matrix.java }}
+          name: target-${{ matrix.os }}-3.2.2-${{ matrix.java }}
 
-      - name: Inflate target directories (3.1.2)
+      - name: Inflate target directories (3.2.2)
         run: |
           tar xf targets.tar
           rm targets.tar
@@ -162,12 +162,12 @@ jobs:
           tar xf targets.tar
           rm targets.tar
 
-      - name: Download target directories (3.1.2)
+      - name: Download target directories (3.2.2)
         uses: actions/download-artifact@v2
         with:
-          name: target-${{ matrix.os }}-3.1.2-${{ matrix.java }}
+          name: target-${{ matrix.os }}-3.2.2-${{ matrix.java }}
 
-      - name: Inflate target directories (3.1.2)
+      - name: Inflate target directories (3.2.2)
         run: |
           tar xf targets.tar
           rm targets.tar

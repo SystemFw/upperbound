@@ -93,7 +93,7 @@ class LimiterSuite extends BaseSuite {
       maxConcurrent = Int.MaxValue,
       productionInterval = 1.millis,
       producers = 4,
-      jobsPerProducer = 100,
+      jobsPerProducer = if (isJS) 10 else 100,
       jobCompletion = 0.seconds
     )
 
@@ -108,7 +108,7 @@ class LimiterSuite extends BaseSuite {
       maxConcurrent = Int.MaxValue,
       productionInterval = 300.millis,
       producers = 1,
-      jobsPerProducer = 100,
+      jobsPerProducer = if (isJS) 10 else 100,
       jobCompletion = 0.seconds
     )
 

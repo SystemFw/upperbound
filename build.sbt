@@ -18,7 +18,7 @@ Global / excludeLintKeys += scmInfo
 val Scala213 = "2.13.8"
 ThisBuild / spiewakMainBranches := Seq("main")
 
-ThisBuild / crossScalaVersions := Seq(Scala213, "3.1.2", "2.12.14")
+ThisBuild / crossScalaVersions := Seq(Scala213, "3.2.2", "2.12.14")
 ThisBuild / scalaVersion := (ThisBuild / crossScalaVersions).value.head
 ThisBuild / initialCommands := """
   |import cats._, data._, syntax.all._
@@ -34,27 +34,32 @@ ThisBuild / initialCommands := """
 ThisBuild / testFrameworks += new TestFramework("munit.Framework")
 ThisBuild / Test / parallelExecution := false
 
-def dep(org: String, prefix: String, version: String)(modules: String*)(testModules: String*) =
-  modules.map(m => org %% (prefix ++ m) % version) ++
-   testModules.map(m => org %% (prefix ++ m) % version % Test)
+def dep(org: String, prefix: String, version: String)(
+    modules: String*
+)(testModules: String*) =
+  Def.setting {
+    modules.map(m => org %%% (prefix ++ m) % version) ++
+      testModules.map(m => org %%% (prefix ++ m) % version % Test)
+  }
 
 lazy val root = project
   .in(file("."))
   .enablePlugins(NoPublishPlugin, SonatypeCiReleasePlugin)
-  .aggregate(core)
+  .aggregate(core.jvm, core.js, core.native)
 
-lazy val core = project
+lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
+  .crossType(CrossType.Pure)
   .in(file("modules/core"))
   .settings(
     name := "upperbound",
     scalafmtOnCompile := true,
     libraryDependencies ++=
-      dep("org.typelevel", "cats-", "2.7.0")("core")() ++
-      dep("org.typelevel", "cats-effect", "3.3.11")("")("-laws", "-testkit") ++
-      dep("co.fs2", "fs2-", "3.2.7")("core")() ++
-      dep("org.scalameta", "munit", "0.7.29")()("", "-scalacheck") ++
-      dep("org.typelevel", "", "1.0.7")()("munit-cats-effect-3") ++
-      dep("org.typelevel",  "scalacheck-effect", "1.0.3")()("", "-munit")
+      dep("org.typelevel", "cats-", "2.9.0")("core")().value ++
+        dep("org.typelevel", "cats-effect", "3.5.0")("")("-laws", "-testkit").value ++
+        dep("co.fs2", "fs2-", "3.7.0")("core")().value ++
+        dep("org.scalameta", "munit", "1.0.0-M7")()("", "-scalacheck").value ++
+        dep("org.typelevel", "", "2.0.0-M3")()("munit-cats-effect").value ++
+        dep("org.typelevel", "scalacheck-effect", "2.0.0-M2")()("", "-munit").value
   )
 
 lazy val docs = project
@@ -71,7 +76,7 @@ lazy val docs = project
     githubWorkflowArtifactUpload := false,
     fatalWarningsInCI := false
   )
-  .dependsOn(core)
+  .dependsOn(core.jvm)
   .enablePlugins(MdocPlugin, NoPublishPlugin)
 
 ThisBuild / githubWorkflowBuildPostamble ++= List(
