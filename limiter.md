@@ -174,7 +174,7 @@ limiter.use { limiter =>
 ```
 
 If you struggled to make sense of the examples in this section, it's
-recommended to watch [this talk](https://github.com/SystemFw/scala-italy-2018.)
+recommended to watch [this talk](https://systemfw.org/talks.html#scala-italy-2018).
 
 ## Adjusting rate and concurrency
 
