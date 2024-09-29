@@ -18,7 +18,7 @@ Global / excludeLintKeys += scmInfo
 val Scala213 = "2.13.8"
 ThisBuild / spiewakMainBranches := Seq("main")
 
-ThisBuild / crossScalaVersions := Seq(Scala213, "3.2.2", "2.12.14")
+ThisBuild / crossScalaVersions := Seq(Scala213, "3.3.4", "2.12.14")
 ThisBuild / scalaVersion := (ThisBuild / crossScalaVersions).value.head
 ThisBuild / initialCommands := """
   |import cats._, data._, syntax.all._
@@ -55,11 +55,17 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     scalafmtOnCompile := true,
     libraryDependencies ++=
       dep("org.typelevel", "cats-", "2.9.0")("core")().value ++
-        dep("org.typelevel", "cats-effect", "3.5.0")("")("-laws", "-testkit").value ++
+        dep("org.typelevel", "cats-effect", "3.5.0")("")(
+          "-laws",
+          "-testkit"
+        ).value ++
         dep("co.fs2", "fs2-", "3.7.0")("core")().value ++
         dep("org.scalameta", "munit", "1.0.0-M7")()("", "-scalacheck").value ++
         dep("org.typelevel", "", "2.0.0-M3")()("munit-cats-effect").value ++
-        dep("org.typelevel", "scalacheck-effect", "2.0.0-M2")()("", "-munit").value
+        dep("org.typelevel", "scalacheck-effect", "2.0.0-M2")()(
+          "",
+          "-munit"
+        ).value
   )
 
 lazy val docs = project
