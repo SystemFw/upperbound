@@ -55,7 +55,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     scalafmtOnCompile := true,
     libraryDependencies ++=
       dep("org.typelevel", "cats-", "2.9.0")("core")().value ++
-        dep("org.typelevel", "cats-effect", "3.5.0")("")("-laws", "-testkit").value ++
+        dep("org.typelevel", "cats-effect", "3.5.7")("")("-laws", "-testkit").value ++
         dep("co.fs2", "fs2-", "3.7.0")("core")().value ++
         dep("org.scalameta", "munit", "1.0.0-M7")()("", "-scalacheck").value ++
         dep("org.typelevel", "", "2.0.0-M3")()("munit-cats-effect").value ++
