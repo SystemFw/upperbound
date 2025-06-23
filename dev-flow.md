@@ -44,8 +44,7 @@ the sidebar needs to have a specific format:
 
 Push a `vx.y.z` tag on `main` to release. It will fail if semver isn't
 respected wrt bincompat.
-Docs are released automatically on each code release, if you need a
-docs-only deploy, (force) push `main` to the `docs-deploy` branch.
+Docs are released automatically on each push to `main`.
 
 
 ## Links
