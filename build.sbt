@@ -30,14 +30,6 @@ ThisBuild / initialCommands := """
 // ThisBuild / Test / parallelExecution := false
 // ThisBuild / Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "-b")
 
-def dep(org: String, prefix: String, version: String)(
-    modules: String*
-)(testModules: String*) =
-  Def.setting {
-    modules.map(m => org %%% (prefix ++ m) % version) ++
-      testModules.map(m => org %%% (prefix ++ m) % version % Test)
-  }
-
 lazy val root = tlCrossRootProject
   .aggregate(core.jvm, core.js, core.native)
 
@@ -47,15 +39,14 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .settings(
     name := "upperbound",
     scalafmtOnCompile := true,
-    libraryDependencies ++=
-      dep("org.typelevel", "cats-", "2.11.0")("core")().value ++
-        dep("org.typelevel", "cats-effect", "3.6.1")("")(
-          "-laws",
-          "-testkit"
-        ).value ++
-        dep("co.fs2", "fs2-", "3.12.0")("core")().value ++
-        dep("org.typelevel", "", "2.1.0")()("munit-cats-effect").value ++
-        dep("org.typelevel", "", "2.0.0-M2")()("scalacheck-effect-munit").value
+    libraryDependencies ++= List(
+      "org.typelevel" %%% "cats-core" % "2.11.0",
+      "org.typelevel" %%% "cats-effect" % "3.6.1",
+      "org.typelevel" %%% "cats-effect-testkit" % "3.6.1" % Test,
+      "co.fs2" %%% "fs2-core" % "3.12.0",
+      "org.typelevel" %%% "munit-cats-effect" % "2.1.0" % Test,
+      "org.typelevel" %%% "scalacheck-effect-munit" % "2.0.0-M2" % Test,
+    )
   )
 
 lazy val docs = project
