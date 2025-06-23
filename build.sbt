@@ -55,7 +55,7 @@ lazy val docs = project
     mdocIn := file("docs"),
     mdocOut := file("target/website"),
     mdocVariables := Map(
-      "version" -> version.value,
+      "version" -> tlLatestVersion.value.getOrElse(version.value),
       "scalaVersions" -> crossScalaVersions.value
         .map(v => s"- **$v**")
         .mkString("\n")
