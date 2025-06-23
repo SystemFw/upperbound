@@ -47,27 +47,10 @@ respected wrt bincompat.
 Docs are released automatically on each code release, if you need a
 docs-only deploy, (force) push `main` to the `docs-deploy` branch.
 
-To change/add branches to release:
-
-> ThisBuild / spiewakMainBranches := Seq("main", "develop")
-
-To relax semver:
-
-> ThisBuild / strictSemVer := false
-
-To publish snapshot on every main build:
-
-> ThisBuild / spiewakCiReleaseSnapshots := true
-
-Caveat:
-If you are publishing snapshots, you need to make sure that new
-commits are fully built before you push a proper release tag: push
-`main`, wait for the snapshot release to complete, and then push the
-tag.
 
 ## Links
 
+- https://typelevel.org/sbt-typelevel/
 - https://github.com/djspiewak/sbt-spiewak
-- https://github.com/djspiewak/sbt-github-actions
 - https://docsify.js.org/#/
 - https://scalameta.org/mdoc/
