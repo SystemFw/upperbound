@@ -51,6 +51,5 @@ docs-only deploy, (force) push `main` to the `docs-deploy` branch.
 ## Links
 
 - https://typelevel.org/sbt-typelevel/
-- https://github.com/djspiewak/sbt-spiewak
 - https://docsify.js.org/#/
 - https://scalameta.org/mdoc/

@@ -37,9 +37,7 @@ def dep(org: String, prefix: String, version: String)(
       testModules.map(m => org %%% (prefix ++ m) % version % Test)
   }
 
-lazy val root = project
-  .in(file("."))
-  .enablePlugins(NoPublishPlugin)
+lazy val root = tlCrossRootProject
   .aggregate(core.jvm, core.js, core.native)
 
 lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
