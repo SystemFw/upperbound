@@ -69,7 +69,7 @@ lazy val docs = project
 ThisBuild / githubWorkflowBuildPostamble ++= List(
   WorkflowStep.Sbt(
     List("docs/mdoc"),
-    cond = Some(s"matrix.scala == '$Scala213'")
+    cond = Some(s"matrix.scala == '2.13'")
   )
 )
 

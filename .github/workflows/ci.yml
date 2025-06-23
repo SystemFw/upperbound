@@ -81,7 +81,7 @@ jobs:
         if: matrix.java == 'temurin@8' && matrix.os == 'ubuntu-22.04'
         run: sbt 'project ${{ matrix.project }}' '++ ${{ matrix.scala }}' doc
 
-      - if: matrix.scala == '2.13.16'
+      - if: matrix.scala == '2.13'
         run: sbt 'project ${{ matrix.project }}' '++ ${{ matrix.scala }}' docs/mdoc
 
       - name: Make target directories
