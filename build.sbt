@@ -1,22 +1,15 @@
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
-ThisBuild / baseVersion := "0.4.0"
+ThisBuild / tlBaseVersion := "0.5"
 ThisBuild / organization := "org.systemfw"
-ThisBuild / publishGithubUser := "SystemFw"
-ThisBuild / publishFullName := "Fabio Labella"
-ThisBuild / homepage := Some(url("https://github.com/SystemFw/upperbound"))
-ThisBuild / scmInfo := Some(
-  ScmInfo(
-    url("https://github.com/SystemFw/upperbound"),
-    "git@github.com:SystemFw/upperbound.git"
-  )
+ThisBuild / developers ++= List(
+  tlGitHubDev("SystemFw", "Fabio Labella")
 )
 ThisBuild / licenses := List(("MIT", url("http://opensource.org/licenses/MIT")))
 ThisBuild / startYear := Some(2017)
-Global / excludeLintKeys += scmInfo
 
 val Scala213 = "2.13.8"
-ThisBuild / spiewakMainBranches := Seq("main")
+
 
 ThisBuild / crossScalaVersions := Seq(Scala213, "3.2.2", "2.12.14")
 ThisBuild / scalaVersion := (ThisBuild / crossScalaVersions).value.head
@@ -44,7 +37,7 @@ def dep(org: String, prefix: String, version: String)(
 
 lazy val root = project
   .in(file("."))
-  .enablePlugins(NoPublishPlugin, SonatypeCiReleasePlugin)
+  .enablePlugins(NoPublishPlugin)
   .aggregate(core.jvm, core.js, core.native)
 
 lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
@@ -74,7 +67,7 @@ lazy val docs = project
         .mkString("\n")
     ),
     githubWorkflowArtifactUpload := false,
-    fatalWarningsInCI := false
+    tlFatalWarnings := false
   )
   .dependsOn(core.jvm)
   .enablePlugins(MdocPlugin, NoPublishPlugin)
