@@ -28,7 +28,6 @@ ThisBuild / initialCommands := """
 // ThisBuild / Test / parallelExecution := false
 // ThisBuild / Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "-b")
 
-
 def dep(org: String, prefix: String, version: String)(
     modules: String*
 )(testModules: String*) =
