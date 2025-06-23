@@ -1,6 +1,7 @@
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
 ThisBuild / tlBaseVersion := "0.5"
+ThisBuild / tlCiReleaseBranches := Seq()
 ThisBuild / organization := "org.systemfw"
 ThisBuild / organizationName := "Fabio Labella"
 ThisBuild / developers ++= List(
