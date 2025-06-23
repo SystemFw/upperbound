@@ -24,8 +24,10 @@ ThisBuild / initialCommands := """
   |import upperbound._
 """.stripMargin
 
-ThisBuild / testFrameworks += new TestFramework("munit.Framework")
-ThisBuild / Test / parallelExecution := false
+// If debugging tests, it's sometimes useful to disable parallel execution and test result buffering:
+// ThisBuild / Test / parallelExecution := false
+// ThisBuild / Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "-b")
+
 
 def dep(org: String, prefix: String, version: String)(
     modules: String*
