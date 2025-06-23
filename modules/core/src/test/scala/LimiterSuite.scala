@@ -162,7 +162,7 @@ class LimiterSuite extends BaseSuite {
 
       (
         job,
-        skew >> job.timeoutTo(200.millis, IO.unit),
+        skew >> job.void.timeoutTo(200.millis, IO.unit),
         skew >> skew >> job
       ).parMapN((t1, _, t3) => t3 - t1)
     }
@@ -179,7 +179,7 @@ class LimiterSuite extends BaseSuite {
 
       (
         job,
-        skew >> job.timeoutTo(200.millis, IO.unit),
+        skew >> job.void.timeoutTo(200.millis, IO.unit),
         skew >> skew >> job
       ).parMapN((t1, _, t3) => t3 - t1)
     }
