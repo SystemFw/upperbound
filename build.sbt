@@ -25,7 +25,8 @@ ThisBuild / initialCommands := """
   |import upperbound._
 """.stripMargin
 
-// If debugging tests, it's sometimes useful to disable parallel execution and test result buffering:
+// If debugging tests, it's sometimes useful to disable parallel
+// execution and test result buffering:
 // ThisBuild / Test / parallelExecution := false
 // ThisBuild / Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "-b")
 
