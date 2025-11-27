@@ -10,7 +10,7 @@ ThisBuild / developers ++= List(
 ThisBuild / licenses := List(("MIT", url("http://opensource.org/licenses/MIT")))
 ThisBuild / startYear := Some(2017)
 
-val Scala213 = "2.13.16"
+val Scala213 = "2.13.18"
 
 ThisBuild / crossScalaVersions := Seq(Scala213, "3.3.6", "2.12.20")
 ThisBuild / scalaVersion := (ThisBuild / crossScalaVersions).value.head
